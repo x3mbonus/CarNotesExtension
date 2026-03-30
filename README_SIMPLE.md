@@ -13,7 +13,7 @@ Add colored notes directly to car listings on mobile.de and otomoto.pl.
 ## How to Use
 
 1. Go to mobile.de or otomoto.pl and search for cars
-2. Refresh the page (F5) 
+2. Refresh the page (F5)
 3. Click **✏️ pencil** on any listing to add a note
 4. Type your note → Choose color → Click **Save Note**
 5. Your note appears on the listing with the selected background color
@@ -21,7 +21,7 @@ Add colored notes directly to car listings on mobile.de and otomoto.pl.
 
 ## Features
 
-- ✏️ Add notes directly on car listings  
+- ✏️ Add notes directly on car listings
 - 🎨 8 color options for background
 - 💾 Notes saved automatically in browser
 - 🗑️ Delete notes anytime

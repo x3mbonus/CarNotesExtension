@@ -31,6 +31,8 @@ async function initializeContentScript() {
         observer.observerStarted = true;
     }
 }
+
+async function handleMobileDe() {
     // Find all article elements (car listings on mobile.de)
     const articles = document.querySelectorAll('article');
 
