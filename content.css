@@ -1,8 +1,19 @@
 /* Car Notes Display Styles */
 
 .car-note-display {
-    margin: 8px 0;
+    margin: 12px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e0e0e0;
     position: relative;
+}
+
+/* Detail page note display - fixed positioning */
+.car-note-display-detail {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    z-index: 10000;
+    max-width: 300px;
 }
 
 .car-note-content {

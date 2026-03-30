@@ -18,7 +18,25 @@ let currentModal = null;
 
 async function initializeContentScript() {
     const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
+    const search = window.location.search;
 
+    // Check if it's a detail page
+    const isMobileDeDetail = hostname.includes('mobile.de') &&
+        (pathname.includes('/auto-inserat/') || pathname.includes('/details.html'));
+    const isOtomotoDetail = hostname.includes('otomoto.pl') &&
+        pathname.includes('/oferta/') && pathname.endsWith('.html');
+
+    // Handle detail pages
+    if (isMobileDeDetail) {
+        handleMobileDeDetail(search);
+        return; // Don't process listings on detail pages
+    } else if (isOtomotoDetail) {
+        handleOtomotoDetail(pathname);
+        return; // Don't process listings on detail pages
+    }
+
+    // Handle listing pages
     if (hostname.includes('mobile.de')) {
         handleMobileDe();
     } else if (hostname.includes('otomoto.pl')) {
@@ -67,6 +85,25 @@ async function handleOtomoto() {
     }
 }
 
+function handleMobileDeDetail(search) {
+    // Extract ID from URL query parameter on detail page
+    const match = search.match(/[?&]id=(\d+)/);
+    if (match) {
+        const carId = match[1];
+        addNoteButtonDetail(carId);
+    }
+}
+
+function handleOtomotoDetail(pathname) {
+    // Extract ID from URL path on detail page
+    // Pattern: /oferta/name-ID.html
+    const match = pathname.match(/\/oferta\/.+-(\w+)\.html/);
+    if (match) {
+        const carId = match[1];
+        addNoteButtonDetail(carId);
+    }
+}
+
 function extractMobileDeId(article) {
     // Find the main link in the article
     const link = article.querySelector('a[href*="details.html"]');
@@ -87,15 +124,24 @@ function extractMobileDeId(article) {
 }
 
 function extractOtomotoId(element) {
-    // Try data attribute
-    const id = element.getAttribute('data-ad-id');
+    // Try data-id attribute (current otomoto structure)
+    const id = element.getAttribute('data-id');
     if (id) return id;
 
-    // Try from href in article
-    const link = element.querySelector('a[href*="/ad/"]');
-    if (link) {
-        const match = link.href.match(/\/ad\/(\d+)/);
+    // Try data-ad-id attribute (legacy)
+    const adId = element.getAttribute('data-ad-id');
+    if (adId) return adId;
+
+    // Try from href in article - handle new URL structure
+    const link = element.querySelector('a[href*="otomoto.pl"]');
+    if (link && link.href) {
+        // Try extracting from oferta URL: /oferta/name-ID...html
+        const match = link.href.match(/\/oferta\/.+-(\w+)\.html/);
         if (match) return match[1];
+
+        // Fallback: try old /ad/ pattern
+        const oldMatch = link.href.match(/\/ad\/(\d+)/);
+        if (oldMatch) return oldMatch[1];
     }
 
     return null;
@@ -107,10 +153,6 @@ async function addNoteButton(article, carId) {
     // Get the note for this car
     const note = await getNote(carId);
 
-    // Find a good place to insert the note display - look for the car title/header area
-    const titleSection = article.querySelector('h2') || article.querySelector('section');
-    if (!titleSection) return;
-
     // Create the note display container
     const noteDisplay = document.createElement('div');
     noteDisplay.className = 'car-note-display';
@@ -118,26 +160,22 @@ async function addNoteButton(article, carId) {
 
     if (note) {
         // Display the note
+        const textColor = getTextColorForBackground(note.color);
         noteDisplay.innerHTML = `
-            <div class="car-note-content" style="background-color: ${note.color};">
+            <div class="car-note-content" style="background-color: ${note.color}; color: ${textColor};">
                 <div class="car-note-text">${escapeHtml(note.text)}</div>
-                <button class="car-note-edit-btn" data-car-id="${carId}" title="Edit note">✏️</button>
+                <button type="button" class="car-note-edit-btn" data-car-id="${carId}" title="Edit note">✏️</button>
             </div>
         `;
     } else {
         // Display empty state with pencil button
         noteDisplay.innerHTML = `
-            <button class="car-note-add-btn" data-car-id="${carId}" title="Add note">✏️</button>
+            <button type="button" class="car-note-add-btn" data-car-id="${carId}" title="Add note">✏️</button>
         `;
     }
 
-    // Find best insertion point
-    const parent = titleSection.parentNode;
-    if (parent) {
-        parent.insertBefore(noteDisplay, titleSection);
-    } else {
-        article.insertBefore(noteDisplay, article.firstChild);
-    }
+    // Insert note display as sibling after article
+    article.parentNode.insertBefore(noteDisplay, article.nextSibling);
 
     // Attach event listeners
     const editBtn = noteDisplay.querySelector('.car-note-edit-btn');
@@ -147,6 +185,7 @@ async function addNoteButton(article, carId) {
         editBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             showNoteModal(carId, note, article);
         });
     }
@@ -155,7 +194,66 @@ async function addNoteButton(article, carId) {
         addBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             showNoteModal(carId, null, article);
+        });
+    }
+}
+
+async function addNoteButtonDetail(carId) {
+    // For detail pages - use fixed positioning in top-right
+
+    // Check if note display already exists for this car
+    const existingDisplay = document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`);
+    if (existingDisplay) {
+        return; // Already added, don't create duplicate
+    }
+
+    const note = await getNote(carId);
+
+    // Create the note display container
+    const noteDisplay = document.createElement('div');
+    noteDisplay.className = 'car-note-display-detail';
+    noteDisplay.setAttribute('data-car-id', carId);
+
+    if (note) {
+        // Display the note
+        const textColor = getTextColorForBackground(note.color);
+        noteDisplay.innerHTML = `
+            <div class="car-note-content" style="background-color: ${note.color}; color: ${textColor};">
+                <div class="car-note-text">${escapeHtml(note.text)}</div>
+                <button type="button" class="car-note-edit-btn" data-car-id="${carId}" title="Edit note">✏️</button>
+            </div>
+        `;
+    } else {
+        // Display empty state with pencil button
+        noteDisplay.innerHTML = `
+            <button type="button" class="car-note-add-btn" data-car-id="${carId}" title="Add note">✏️</button>
+        `;
+    }
+
+    // Add to page body with fixed positioning
+    document.body.appendChild(noteDisplay);
+
+    // Attach event listeners
+    const editBtn = noteDisplay.querySelector('.car-note-edit-btn');
+    const addBtn = noteDisplay.querySelector('.car-note-add-btn');
+
+    if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            showNoteModal(carId, note, null);
+        });
+    }
+
+    if (addBtn) {
+        addBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            showNoteModal(carId, null, null);
         });
     }
 }
@@ -252,7 +350,17 @@ function showNoteModal(carId, existingNote, article) {
         try {
             await saveNoteToStorage(carId, text, color);
             closeModal();
-            updateNoteIndicators();
+
+            // Check if we're on a detail page
+            const detailDisplay = document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`);
+            if (detailDisplay) {
+                // Detail page - just remove and recreate the display element
+                detailDisplay.remove();
+                await addNoteButtonDetail(carId);
+            } else {
+                // Listing page - full reinitialize
+                updateNoteIndicators();
+            }
         } catch (error) {
             alert('Error saving note: ' + error.message);
         }
@@ -265,7 +373,17 @@ function showNoteModal(carId, existingNote, article) {
         try {
             await deleteNoteFromStorage(carId);
             closeModal();
-            updateNoteIndicators();
+
+            // Check if we're on a detail page
+            const detailDisplay = document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`);
+            if (detailDisplay) {
+                // Detail page - just remove and recreate the display element
+                detailDisplay.remove();
+                await addNoteButtonDetail(carId);
+            } else {
+                // Listing page - full reinitialize
+                updateNoteIndicators();
+            }
         } catch (error) {
             alert('Error deleting note: ' + error.message);
         }
@@ -291,13 +409,18 @@ function handleEscapeKey(e) {
 }
 
 async function updateNoteIndicators() {
-    // Clear processed articles cache
-    processedArticles.clear();
-
-    // Remove old displays
+    // Remove old listing page displays
     document.querySelectorAll('.car-note-display').forEach(display => {
         display.remove();
     });
+
+    // Remove old detail page displays
+    document.querySelectorAll('.car-note-display-detail').forEach(display => {
+        display.remove();
+    });
+
+    // Clear processed articles cache
+    processedArticles.clear();
 
     // Re-initialize
     initializeContentScript();
@@ -357,4 +480,19 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Calculate text color for contrast based on background brightness
+function getTextColorForBackground(hexColor) {
+    // Parse hex color
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+
+    // Calculate brightness (perceived luminance)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+    // Return dark text for light backgrounds, light text for dark backgrounds
+    return brightness > 155 ? '#333333' : '#ffffff';
 }
