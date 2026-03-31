@@ -634,6 +634,183 @@ function performReplaceImport(importedNotes) {
 window.exportCarNotes = exportNotesToJSON;
 window.importCarNotes = importNotesFromJSON;
 
+// ==================== VEHICLE DATA EXTRACTION UI ====================
+
+function createExtractionPanel() {
+    // Only show on vehicle detail pages
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
+
+    // Check if on mobile.de detail page
+    const isMobileDeDetail = hostname.includes('mobile.de') &&
+        document.querySelector('[data-testid="vip-price-label"]');
+
+    // Check if on otomoto.pl detail page
+    const isOtomotoDetail = hostname.includes('otomoto.pl') &&
+        pathname.includes('/oferta/') && pathname.endsWith('.html');
+
+    if (!isMobileDeDetail && !isOtomotoDetail) {
+        return;
+    }
+
+    // Don't create duplicate panels
+    if (document.getElementById('car-notes-extractor-panel')) {
+        return;
+    }
+
+    const panel = document.createElement('div');
+    panel.id = 'car-notes-extractor-panel';
+    panel.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: white;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+        padding: 12px;
+        z-index: 10000;
+        min-width: 200px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    const title = document.createElement('div');
+    title.style.cssText = `
+        font-weight: 600;
+        font-size: 12px;
+        margin-bottom: 8px;
+        color: #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    `;
+    title.innerHTML = `
+        <span>📋 Extract Data</span>
+        <button id="extractor-minimize" style="background: none; border: none; cursor: pointer; font-size: 16px; padding: 0; width: 20px; height: 20px;">−</button>
+    `;
+
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.id = 'extractor-buttons';
+    buttonsContainer.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    `;
+
+    const buttons = [
+        { label: '📋 Copy (Text)', action: () => copyExtractedData('text') },
+        { label: '📋 Copy (JSON)', action: () => copyExtractedData('json') },
+        { label: '⬇️ Download (TXT)', action: () => downloadExtractedData('text') },
+        { label: '⬇️ Download (JSON)', action: () => downloadExtractedData('json') }
+    ];
+
+    buttons.forEach(btn => {
+        const button = document.createElement('button');
+        button.textContent = btn.label;
+        button.style.cssText = `
+            width: 100%;
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        `;
+        button.onmouseenter = () => button.style.background = '#0056b3';
+        button.onmouseleave = () => button.style.background = '#007bff';
+        button.onclick = btn.action;
+        buttonsContainer.appendChild(button);
+    });
+
+    panel.appendChild(title);
+    panel.appendChild(buttonsContainer);
+    document.body.appendChild(panel);
+
+    // Minimize functionality
+    document.getElementById('extractor-minimize').addEventListener('click', () => {
+        const buttons = document.getElementById('extractor-buttons');
+        const minimizeBtn = document.getElementById('extractor-minimize');
+        if (buttons.style.display === 'none') {
+            buttons.style.display = 'flex';
+            minimizeBtn.textContent = '−';
+        } else {
+            buttons.style.display = 'none';
+            minimizeBtn.textContent = '+';
+        }
+    });
+}
+
+async function copyExtractedData(format) {
+    if (!window.copyCarDataToClipboard) {
+        showNotification('Extraction not available', 'error');
+        return;
+    }
+
+    try {
+        const result = await window.copyCarDataToClipboard(format);
+        if (result.success) {
+            showNotification(`✅ Copied ${format.toUpperCase()} to clipboard`, 'success');
+        } else {
+            showNotification(`❌ Failed to copy: ${result.error}`, 'error');
+        }
+    } catch (err) {
+        showNotification(`❌ Error: ${err.message}`, 'error');
+    }
+}
+
+function downloadExtractedData(format) {
+    if (!window.downloadCarData) {
+        showNotification('Extraction not available', 'error');
+        return;
+    }
+
+    try {
+        window.downloadCarData(format);
+        showNotification(`✅ Downloading ${format.toUpperCase()} file`, 'success');
+    } catch (err) {
+        showNotification(`❌ Error: ${err.message}`, 'error');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 16px;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+        color: white;
+        border-radius: 4px;
+        font-size: 13px;
+        z-index: 10001;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.remove();
+    }, 3500);
+}
+
+// Initialize extraction panel when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', createExtractionPanel);
+} else {
+    createExtractionPanel();
+}
+
+// Watch for page changes and reinitialize panel
+window.addEventListener('load', createExtractionPanel);
+setTimeout(createExtractionPanel, 1000);
+
+// ==================== END EXTRACTION UI ====================
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'export') {

@@ -26,8 +26,9 @@
         "https://*.mobile.de/*",
         "https://*.otomoto.pl/*"
       ],
-      "js": ["content.js"],
-      "css": ["content.css"]
+      "js": ["vehicle-extractor-simple.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
     }
   ]
 }
