@@ -3,7 +3,7 @@
   "name": "Car Notes",
   "version": "1.0.0",
   "description": "Add colored notes to car listings on mobile.de and otomoto.pl",
-  "permissions": ["storage"],
+  "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://mobile.de/*",
     "https://www.mobile.de/*",
@@ -12,6 +12,10 @@
     "https://*.mobile.de/*",
     "https://*.otomoto.pl/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Car Notes"
+  },
   "content_scripts": [
     {
       "matches": [

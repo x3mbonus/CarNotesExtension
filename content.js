@@ -22,8 +22,11 @@ async function initializeContentScript() {
     const search = window.location.search;
 
     // Check if it's a detail page
+    // Mobile.de: /fahrzeuge/details.html, /auto-inserat/, or language versions like /ru/..../подробности.html
     const isMobileDeDetail = hostname.includes('mobile.de') &&
-        (pathname.includes('/auto-inserat/') || pathname.includes('/details.html'));
+        (pathname.includes('/auto-inserat/') ||
+         pathname.includes('/details.html') ||
+        (pathname.endsWith('.html') && search.includes('id=') && !pathname.includes('/search')));
     const isOtomotoDetail = hostname.includes('otomoto.pl') &&
         pathname.includes('/oferta/') && pathname.endsWith('.html');
 
@@ -339,11 +342,6 @@ function showNoteModal(carId, existingNote, article) {
     // Save button
     modal.querySelector('.car-note-modal-save-btn').addEventListener('click', async () => {
         const text = textarea.value.trim();
-        if (!text) {
-            alert('Please enter a note');
-            return;
-        }
-
         const selectedColorBtn = modal.querySelector('.car-note-color-btn.selected');
         const color = selectedColorBtn ? selectedColorBtn.dataset.color : '#ffeb3b';
 
@@ -496,3 +494,154 @@ function getTextColorForBackground(hexColor) {
     // Return dark text for light backgrounds, light text for dark backgrounds
     return brightness > 155 ? '#333333' : '#ffffff';
 }
+
+// Export all notes to JSON file
+function exportNotesToJSON() {
+    chrome.storage.local.get(['carNotes'], (result) => {
+        const notes = result.carNotes || {};
+        const jsonData = JSON.stringify(notes, null, 2);
+
+        // Create blob and download
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `car-notes-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+
+        console.log('✅ Notes exported successfully!');
+    });
+}
+
+// Import notes from JSON file
+function importNotesFromJSON() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const importedNotes = JSON.parse(event.target.result);
+
+                // Get existing notes
+                chrome.storage.local.get(['carNotes'], (result) => {
+                    const existingNotes = result.carNotes || {};
+                    const importCount = Object.keys(importedNotes).length;
+
+                    // First confirm: Merge?
+                    const isMerge = confirm(`Merge with existing notes?\n\n(${importCount} notes to import)`);
+
+                    if (isMerge) {
+                        // Perform merge
+                        performMergeImport(importedNotes, existingNotes);
+                    } else {
+                        // Second confirm: Replace?
+                        const isReplace = confirm(`Replace all notes and delete existing?\n\n(${importCount} notes to import)`);
+
+                        if (isReplace) {
+                            // Perform replace
+                            performReplaceImport(importedNotes);
+                        }
+                        // If no to replace, cancel (do nothing)
+                    }
+                });
+            } catch (error) {
+                alert('❌ Error importing notes: ' + error.message);
+                console.error('Import error:', error);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    input.click();
+}
+
+// Perform merge import
+function performMergeImport(importedNotes, existingNotes) {
+    const merged = { ...existingNotes };
+    let mergedCount = 0;
+    let newCount = 0;
+    let skippedCount = 0;
+    let replacedCount = 0;
+
+    for (const carId in importedNotes) {
+        if (merged[carId]) {
+            const existingText = (merged[carId].text || '').trim();
+            const importedText = (importedNotes[carId].text || '').trim();
+
+            // If texts are identical, skip
+            if (existingText === importedText) {
+                skippedCount++;
+                continue;
+            }
+
+            // If imported text starts with existing text, replace with imported
+            if (importedText.startsWith(existingText)) {
+                merged[carId] = {
+                    text: importedText,
+                    color: importedNotes[carId].color,
+                    createdAt: merged[carId].createdAt,
+                    updatedAt: new Date().toISOString()
+                };
+                replacedCount++;
+                continue;
+            }
+
+            // If existing text starts with imported text, skip (keep existing)
+            if (existingText.startsWith(importedText)) {
+                skippedCount++;
+                continue;
+            }
+
+            // Otherwise combine text with delimiter
+            merged[carId] = {
+                text: existingText && importedText
+                    ? `${existingText}\n---\n${importedText}`
+                    : importedText || existingText,
+                color: importedNotes[carId].color,
+                createdAt: merged[carId].createdAt,
+                updatedAt: new Date().toISOString()
+            };
+            mergedCount++;
+        } else {
+            // New note, just add it
+            merged[carId] = importedNotes[carId];
+            newCount++;
+        }
+    }
+
+    chrome.storage.local.set({ carNotes: merged }, () => {
+        console.log(`✅ Import complete! New: ${newCount}, Merged: ${mergedCount}, Replaced: ${replacedCount}, Skipped: ${skippedCount}`);
+        updateNoteIndicators();
+    });
+}
+
+// Perform replace import
+function performReplaceImport(importedNotes) {
+    chrome.storage.local.set({ carNotes: importedNotes }, () => {
+        console.log(`✅ Replaced all notes! ${Object.keys(importedNotes).length} notes imported.`);
+        updateNoteIndicators();
+    });
+}
+
+// Make functions globally accessible
+window.exportCarNotes = exportNotesToJSON;
+window.importCarNotes = importNotesFromJSON;
+
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'export') {
+        exportNotesToJSON();
+        sendResponse({ status: 'exported' });
+    } else if (request.action === 'import') {
+        importNotesFromJSON();
+        sendResponse({ status: 'importing' });
+    }
+    return true;
+});
