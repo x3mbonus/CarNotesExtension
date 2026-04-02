@@ -78,12 +78,19 @@ async function handleMobileDe() {
 
 async function handleOtomoto() {
     // Find all article elements (car listings on otomoto.pl)
-    // Only select articles that likely contain car listings
-    const articles = document.querySelectorAll('article[data-id], article[data-ad-id]');
+    const articles = document.querySelectorAll('article');
 
     // Clean up orphaned note displays (from pagination)
     const currentArticleIds = new Set();
     articles.forEach(article => {
+        // Skip widget articles early
+        if (article.closest('#car-valuation-slot') ||
+            article.closest('[role="dialog"]') ||
+            article.closest('.car-valuation') ||
+            article.closest('aside')) {
+            return;
+        }
+
         const id = extractOtomotoId(article);
         if (id) currentArticleIds.add(id);
     });
@@ -92,7 +99,6 @@ async function handleOtomoto() {
     document.querySelectorAll('.car-note-display').forEach(noteDisplay => {
         const carId = noteDisplay.getAttribute('data-car-id');
         if (!currentArticleIds.has(carId)) {
-            console.log('[CarNotes] Removing orphaned note display for ID:', carId);
             noteDisplay.remove();
         }
     });
@@ -108,7 +114,6 @@ async function handleOtomoto() {
             article.closest('.car-valuation') ||
             article.closest('aside')) {
             processedArticles.add(article);
-            console.log('[CarNotes] ⏭️ Skipped article inside widget/modal container');
             continue;
         }
 
@@ -121,7 +126,6 @@ async function handleOtomoto() {
         } else {
             // Mark as processed even without ID to avoid reprocessing
             processedArticles.add(article);
-            console.log('[CarNotes] Skipped article without valid ID');
         }
     }
 }
@@ -195,55 +199,43 @@ function extractOtomotoId(element) {
     }
 
     if (link && link.href) {
-        console.log('[CarNotes] Found link in article:', link.href);
-
         // Extract ID - look for the ID pattern that appears before .html
         // URLs look like: /oferta/volkswagen-touran-ID6HVVQR.html
         // We need to capture the ID which starts with "ID" and contains alphanumeric chars
         const idMatch = link.href.match(/(ID[A-Za-z0-9]+)\.html/);
         if (idMatch && idMatch[1]) {
-            console.log('[CarNotes] ✅ Extracted URL-based ID:', idMatch[1]);
             return idMatch[1].trim();
         }
 
         // Fallback: try old /ad/ pattern
         const oldMatch = link.href.match(/\/ad\/(\d+)/);
         if (oldMatch && oldMatch[1]) {
-            console.log('[CarNotes] ✅ Extracted old ad ID:', oldMatch[1]);
             return oldMatch[1].trim();
         }
-
-        console.log('[CarNotes] ❌ Could not extract ID from URL:', link.href);
-    } else {
-        console.log('[CarNotes] ❌ No href link found in article');
     }
 
     // PRIORITY 2: Try data-id attribute (doesn't match stored notes)
     let id = element.getAttribute('data-id');
     if (id && id.trim()) {
-        console.log('[CarNotes] Found data-id (not used for notes):', id);
+        // Skip data-id - it won't match stored notes
     }
 
     // PRIORITY 3: Try data-ad-id attribute (legacy)
     const adId = element.getAttribute('data-ad-id');
     if (adId && adId.trim()) {
-        console.log('[CarNotes] ✅ Using data-ad-id:', adId);
         return adId.trim();
     }
 
-    console.log('[CarNotes] ❌ No usable ID found for element');
     return null;
 }
 
 async function addNoteButton(article, carId) {
     if (!article || !carId || !carId.trim()) {
-        console.log('[CarNotes] Skipped: Invalid article or carId');
         return;
     }
 
     // Get the note for this car
     const note = await getNote(carId);
-    console.log('[CarNotes] Retrieved note for ID', carId, ':', note ? 'Found' : 'Not found');
 
     // Create the note display container
     const noteDisplay = document.createElement('div');
@@ -365,8 +357,8 @@ function showNoteModal(carId, existingNote, article) {
     const modal = document.createElement('div');
     modal.className = 'car-note-modal';
 
-    const colors = ['#ffeb3b', '#ff9800', '#f44336', '#e91e63', '#9c27b0', '#2196f3', '#4caf50', '#00bcd4'];
-    const currentColor = existingNote ? existingNote.color : '#ffeb3b';
+    const colors = ['#607D8B', '#4caf50', '#00bcd4', '#ff9800', '#f44336', '#9c27b0', '#ffeb3b', '#8b4513'];
+    const currentColor = existingNote ? existingNote.color : '#607D8B';
     const currentText = existingNote ? existingNote.text : '';
 
     modal.innerHTML = `
@@ -432,7 +424,7 @@ function showNoteModal(carId, existingNote, article) {
     modal.querySelector('.car-note-modal-save-btn').addEventListener('click', async () => {
         const text = textarea.value.trim();
         const selectedColorBtn = modal.querySelector('.car-note-color-btn.selected');
-        const color = selectedColorBtn ? selectedColorBtn.dataset.color : '#ffeb3b';
+        const color = selectedColorBtn ? selectedColorBtn.dataset.color : '#607D8B';
 
         try {
             await saveNoteToStorage(carId, text, color);
@@ -517,22 +509,13 @@ async function updateNoteIndicators() {
 async function getNote(carId) {
     return new Promise((resolve) => {
         if (!carId || !carId.trim()) {
-            console.warn('[CarNotes] getNote called with invalid carId');
             resolve(null);
             return;
         }
 
         chrome.storage.local.get(['carNotes'], (result) => {
             const notes = result.carNotes || {};
-            const note = notes[carId] || null;
-
-            if (note) {
-                console.log('[CarNotes] Note found for ID', carId);
-            } else {
-                console.log('[CarNotes] No note found for ID', carId, 'Available IDs:', Object.keys(notes));
-            }
-
-            resolve(note);
+            resolve(notes[carId] || null);
         });
     });
 }
