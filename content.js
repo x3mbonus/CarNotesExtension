@@ -2,6 +2,9 @@
 // Adds pencil icons and notes to car listings on mobile.de and otomoto.pl
 
 const processedArticles = new Set();
+const queriedCarIds = new Set(); // Track which car IDs we've already fetched from DB
+const notesCache = {}; // Cache fetched notes to avoid re-querying on reinit
+let initializeTimer = null; // Debounce timer
 
 // Initialize
 document.addEventListener('DOMContentLoaded', initializeContentScript);
@@ -10,7 +13,9 @@ setTimeout(initializeContentScript, 500);
 
 // Watch for dynamically added listings
 const observer = new MutationObserver(() => {
-    setTimeout(initializeContentScript, 200);
+    // Debounce: only call initializeContentScript after mutations stop for 300ms
+    clearTimeout(initializeTimer);
+    initializeTimer = setTimeout(initializeContentScript, 300);
 });
 
 // Global modal reference
@@ -20,20 +25,6 @@ async function initializeContentScript() {
     const hostname = window.location.hostname;
     const pathname = window.location.pathname;
     const search = window.location.search;
-
-    // Try to sync with Supabase on page load
-    if (typeof SupabaseSync !== 'undefined') {
-        const autoSync = await new Promise(res => {
-            chrome.storage.local.get(['autoSync'], r => {
-                res(r.autoSync !== false);
-            });
-        });
-        if (autoSync) {
-            SupabaseSync.syncBidirectional().catch(err => {
-                console.warn('Initial Supabase sync failed (continuing with local storage):', err);
-            });
-        }
-    }
 
     // Check if it's a detail page
     // Mobile.de: /fahrzeuge/details.html, /auto-inserat/, or language versions like /ru/..../подробности.html
@@ -68,34 +59,78 @@ async function initializeContentScript() {
 }
 
 async function handleMobileDe() {
+    // Pause observer while processing to avoid duplicate calls
+    observer.disconnect();
+
     // Find all article elements (car listings on mobile.de)
     const articles = document.querySelectorAll('article');
 
-    for (const article of articles) {
-        // Skip if already processed
-        if (processedArticles.has(article)) {
-            continue;
-        }
-
+    // Collect car IDs that we haven't queried yet
+    // Special case: if cache is empty AND we've queried before, it means page reloaded - refetch
+    const isCacheEmpty = Object.keys(notesCache).length === 0;
+    const carIds = [];
+    articles.forEach(article => {
         const carId = extractMobileDeId(article);
-        // Only add button if we have a valid carId
-        if (carId && carId.trim()) {
-            processedArticles.add(article);
-            addNoteButton(article, carId);
-        } else {
-            // Mark as processed even without ID to avoid reprocessing
-            processedArticles.add(article);
-            console.log('[CarNotes] Skipped mobile.de article without valid ID');
+        // Query if: (1) haven't queried yet OR (2) cache is empty (page reload)
+        if (carId && carId.trim() && (!queriedCarIds.has(carId) || (isCacheEmpty && queriedCarIds.size > 0))) {
+            carIds.push(carId);
+            if (!queriedCarIds.has(carId)) {
+                queriedCarIds.add(carId);
+            }
         }
+    });
+
+    // Fetch only new notes from DB in one query
+    let dbNotes = {};
+    if (carIds.length > 0 && typeof SupabaseSync !== 'undefined') {
+        dbNotes = await SupabaseSync.getNotesByIds(carIds) || {};
+        // Cache the fetched notes for future reinitializations
+        Object.assign(notesCache, dbNotes);
+    }
+
+    for (const article of articles) {
+        // Check if note display already exists for this article
+        const existingDisplay = article.nextElementSibling;
+        const hasNoteDisplay = existingDisplay && existingDisplay.classList.contains('car-note-display');
+
+        // If display doesn't exist, add/update the button
+        if (!hasNoteDisplay) {
+            const carId = extractMobileDeId(article);
+            // Only add button if we have a valid carId
+            if (carId && carId.trim()) {
+                processedArticles.add(article);
+                // Use cached note if available
+                const note = notesCache[carId] !== undefined ? notesCache[carId] : (dbNotes[carId] || null);
+                addNoteButton(article, carId, note);
+            } else {
+                processedArticles.add(article);
+            }
+        } else {
+            processedArticles.add(article);
+        }
+    }
+
+    // Resume observer after processing
+    if (!observer.observerStarted) {
+        observer.observe(document.body, { childList: true, subtree: true });
+        observer.observerStarted = true;
+    } else {
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 }
 
 async function handleOtomoto() {
+    // Pause observer while processing to avoid duplicate calls
+    observer.disconnect();
+
     // Find all article elements (car listings on otomoto.pl)
     const articles = document.querySelectorAll('article');
 
     // Clean up orphaned note displays (from pagination)
     const currentArticleIds = new Set();
+    const isCacheEmpty = Object.keys(notesCache).length === 0;
+    const carIds = [];
+
     articles.forEach(article => {
         // Skip widget articles early
         if (article.closest('#car-valuation-slot') ||
@@ -106,7 +141,16 @@ async function handleOtomoto() {
         }
 
         const id = extractOtomotoId(article);
-        if (id) currentArticleIds.add(id);
+        if (id) {
+            currentArticleIds.add(id);
+            // Query if: (1) haven't queried yet OR (2) cache is empty (page reload)
+            if (!queriedCarIds.has(id) || isCacheEmpty) {
+                carIds.push(id);
+                if (!queriedCarIds.has(id)) {
+                    queriedCarIds.add(id);
+                }
+            }
+        }
     });
 
     // Remove note displays that don't have corresponding articles on this page
@@ -117,11 +161,15 @@ async function handleOtomoto() {
         }
     });
 
-    for (const article of articles) {
-        if (processedArticles.has(article)) {
-            continue;
-        }
+    // Fetch only new notes from DB in one query
+    let dbNotes = {};
+    if (carIds.length > 0 && typeof SupabaseSync !== 'undefined') {
+        dbNotes = await SupabaseSync.getNotesByIds(carIds) || {};
+        // Cache the fetched notes for future reinitializations
+        Object.assign(notesCache, dbNotes);
+    }
 
+    for (const article of articles) {
         // Skip articles inside widget containers (car valuation, modals, etc.)
         if (article.closest('#car-valuation-slot') ||
             article.closest('[role="dialog"]') ||
@@ -131,16 +179,33 @@ async function handleOtomoto() {
             continue;
         }
 
-        const carId = extractOtomotoId(article);
+        // Check if note display already exists for this article
+        const existingDisplay = article.nextElementSibling;
+        const hasNoteDisplay = existingDisplay && existingDisplay.classList.contains('car-note-display');
 
-        // Only add button if we have a valid carId
-        if (carId && carId.trim()) {
-            processedArticles.add(article);
-            addNoteButton(article, carId);
+        // If display doesn't exist, add/update the button
+        if (!hasNoteDisplay) {
+            const carId = extractOtomotoId(article);
+            // Only add button if we have a valid carId
+            if (carId && carId.trim()) {
+                processedArticles.add(article);
+                // Use cached note if available
+                const note = notesCache[carId] !== undefined ? notesCache[carId] : (dbNotes[carId] || null);
+                addNoteButton(article, carId, note);
+            } else {
+                processedArticles.add(article);
+            }
         } else {
-            // Mark as processed even without ID to avoid reprocessing
             processedArticles.add(article);
         }
+    }
+
+    // Resume observer after processing
+    if (!observer.observerStarted) {
+        observer.observe(document.body, { childList: true, subtree: true });
+        observer.observerStarted = true;
+    } else {
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 }
 
@@ -243,13 +308,19 @@ function extractOtomotoId(element) {
     return null;
 }
 
-async function addNoteButton(article, carId) {
+async function addNoteButton(article, carId, dbNote = null) {
     if (!article || !carId || !carId.trim()) {
         return;
     }
 
-    // Get the note for this car
-    const note = await getNote(carId);
+    // Use provided note from batch query
+    // Only fallback to individual fetch if this car wasn't in a batch query
+    let note = dbNote;
+    if (note === null && !queriedCarIds.has(carId)) {
+        // Car wasn't batch-queried yet, fetch individually
+        note = await getNote(carId);
+    }
+    // If note is still null but carId IS in queriedCarIds, it means no note exists (don't fetch again)
 
     // Create the note display container
     const noteDisplay = document.createElement('div');
@@ -451,8 +522,8 @@ function showNoteModal(carId, existingNote, article) {
                 detailDisplay.remove();
                 await addNoteButtonDetail(carId);
             } else {
-                // Listing page - full reinitialize
-                updateNoteIndicators();
+                // Listing page - update only this specific note display
+                updateSingleNoteDisplay(carId, text, color);
             }
         } catch (error) {
             alert('Error saving note: ' + error.message);
@@ -474,8 +545,8 @@ function showNoteModal(carId, existingNote, article) {
                 detailDisplay.remove();
                 await addNoteButtonDetail(carId);
             } else {
-                // Listing page - full reinitialize
-                updateNoteIndicators();
+                // Listing page - update only this specific note display
+                updateSingleNoteDisplay(carId, null, null);
             }
         } catch (error) {
             alert('Error deleting note: ' + error.message);
@@ -512,91 +583,140 @@ async function updateNoteIndicators() {
         display.remove();
     });
 
-    // Clear processed articles cache
+    // Clear processed articles cache and cache
     processedArticles.clear();
+    queriedCarIds.clear();
+    Object.keys(notesCache).forEach(key => delete notesCache[key]);
 
     // Re-initialize
     initializeContentScript();
 }
 
+// Update a single note display after save/delete (avoids full page reload)
+function updateSingleNoteDisplay(carId, text, color) {
+    const noteDisplay = document.querySelector(`[data-car-id="${carId}"].car-note-display`);
+
+    if (!noteDisplay) {
+        return; // Display not found, skip
+    }
+
+    // Clear previous content
+    noteDisplay.innerHTML = '';
+
+    if (text && text.trim()) {
+        // Show note with new content
+        const textColor = getTextColorForBackground(color);
+        noteDisplay.innerHTML = `
+            <div class="car-note-content" style="background-color: ${color}; color: ${textColor};">
+                <div class="car-note-text">${escapeHtml(text)}</div>
+                <button type="button" class="car-note-edit-btn" data-car-id="${carId}" title="Edit note">✏️</button>
+            </div>
+        `;
+
+        const editBtn = noteDisplay.querySelector('.car-note-edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                showNoteModal(carId, { text, color }, null);
+            });
+        }
+    } else {
+        // Show empty state with pencil button
+        noteDisplay.innerHTML = `
+            <button type="button" class="car-note-add-btn" data-car-id="${carId}" title="Add note">✏️</button>
+        `;
+
+        const addBtn = noteDisplay.querySelector('.car-note-add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                showNoteModal(carId, null, null);
+            });
+        }
+    }
+}
+
 // Get note from storage
 async function getNote(carId) {
-    return new Promise((resolve) => {
-        if (!carId || !carId.trim()) {
-            resolve(null);
-            return;
-        }
+    if (!carId || !carId.trim()) {
+        return null;
+    }
 
-        chrome.storage.local.get(['carNotes'], (result) => {
-            const notes = result.carNotes || {};
-            resolve(notes[carId] || null);
-        });
-    });
+    // Fetch from Supabase DB if available
+    if (typeof SupabaseSync !== 'undefined') {
+        try {
+            return await SupabaseSync.getNoteById(carId);
+        } catch (err) {
+            console.error('Failed to fetch note from DB:', err);
+            return null;
+        }
+    }
+
+    return null;
 }
 
 // Save note to storage
 async function saveNoteToStorage(carId, text, color) {
-    return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['carNotes'], async (result) => {
-            const notes = result.carNotes || {};
-            notes[carId] = {
+    if (!carId || !carId.trim()) {
+        throw new Error('Invalid car ID');
+    }
+
+    // Save directly to Supabase DB
+    if (typeof SupabaseSync !== 'undefined') {
+        const noteData = {
+            text: text,
+            color: color
+        };
+
+        try {
+            const result = await SupabaseSync.syncNoteToSupabase(carId, noteData);
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to save note');
+            }
+            // Update cache with the saved note
+            notesCache[carId] = {
                 text: text,
                 color: color,
-                createdAt: notes[carId]?.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                createdAt: notesCache[carId]?.createdAt || result.createdAt,
+                updatedAt: result.updatedAt
             };
-            chrome.storage.local.set({ carNotes: notes }, async () => {
-                if (chrome.runtime.lastError) {
-                    reject(chrome.runtime.lastError);
-                } else {
-                    // Sync to Supabase if configured
-                    if (typeof SupabaseSync !== 'undefined') {
-                        const autoSync = await new Promise(res => {
-                            chrome.storage.local.get(['autoSync'], r => {
-                                res(r.autoSync !== false);
-                            });
-                        });
-                        if (autoSync) {
-                            SupabaseSync.syncNoteToSupabase(carId, notes[carId]).catch(err => {
-                                console.warn('Supabase sync failed (using local storage):', err);
-                            });
-                        }
-                    }
-                    resolve();
-                }
-            });
-        });
-    });
+            return result.updatedAt;
+        } catch (err) {
+            console.error('Failed to save note to DB:', err);
+            throw err;
+        }
+    } else {
+        throw new Error('Supabase not available');
+    }
 }
 
 // Delete note from storage
 async function deleteNoteFromStorage(carId) {
-    return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['carNotes'], async (result) => {
-            const notes = result.carNotes || {};
-            delete notes[carId];
-            chrome.storage.local.set({ carNotes: notes }, async () => {
-                if (chrome.runtime.lastError) {
-                    reject(chrome.runtime.lastError);
-                } else {
-                    // Sync deletion to Supabase if configured
-                    if (typeof SupabaseSync !== 'undefined') {
-                        const autoSync = await new Promise(res => {
-                            chrome.storage.local.get(['autoSync'], r => {
-                                res(r.autoSync !== false);
-                            });
-                        });
-                        if (autoSync) {
-                            SupabaseSync.deleteNoteFromSupabase(carId).catch(err => {
-                                console.warn('Supabase delete failed (using local storage):', err);
-                            });
-                        }
-                    }
-                    resolve();
-                }
-            });
-        });
-    });
+    if (!carId || !carId.trim()) {
+        throw new Error('Invalid car ID');
+    }
+
+    // Delete directly from Supabase DB
+    if (typeof SupabaseSync !== 'undefined') {
+        try {
+            const result = await SupabaseSync.deleteNoteFromSupabase(carId);
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to delete note');
+            }
+            // Update cache to reflect deletion
+            notesCache[carId] = null;
+            return result;
+        } catch (err) {
+            console.error('Failed to delete note from DB:', err);
+            throw err;
+        }
+    } else {
+        throw new Error('Supabase not available');
+    }
 }
 
 // Escape HTML special characters

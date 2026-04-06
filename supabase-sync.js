@@ -107,21 +107,115 @@ const SupabaseClient = {
 
 // Supabase sync functions using REST API
 const SupabaseSync = {
-    // Sync local note to Supabase
-    async syncNoteToSupabase(carId, noteData) {
+    // FETCH: Get notes by list of car IDs (efficient for listings)
+    async getNotesByIds(carIds) {
         if (!await SupabaseClient.isReady()) {
-            return { success: false, reason: 'not_configured' };
+            return {};
         }
 
         try {
-            const row = {
+            if (!Array.isArray(carIds) || carIds.length === 0) {
+                return {};
+            }
+
+            // Use 'in' operator for efficient filtering: car_id=in.(ID1,ID2,ID3)
+            const idList = carIds.map(id => encodeURIComponent(id)).join(',');
+            const url = `${SupabaseClient.url}/rest/v1/car_notes?car_id=in.(${idList})`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'apikey': SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            const notes = {};
+
+            if (Array.isArray(data)) {
+                data.forEach(row => {
+                    notes[row.car_id] = {
+                        text: row.text,
+                        color: row.color,
+                        createdAt: row.created_at,
+                        updatedAt: row.updated_at
+                    };
+                });
+            }
+
+            return notes;
+        } catch (error) {
+            console.error('❌ Supabase fetch notes error:', error);
+            return {};
+        }
+    },
+
+    // FETCH: Get single note from DB
+    async getNoteById(carId) {
+        if (!await SupabaseClient.isReady()) {
+            return null;
+        }
+
+        try {
+            const url = `${SupabaseClient.url}/rest/v1/car_notes?car_id=eq.${encodeURIComponent(carId)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'apikey': SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (Array.isArray(data) && data.length > 0) {
+                const row = data[0];
+                return {
+                    text: row.text,
+                    color: row.color,
+                    createdAt: row.created_at,
+                    updatedAt: row.updated_at
+                };
+            }
+
+            return null;
+        } catch (error) {
+            console.error('❌ Supabase fetch single note error:', error);
+            return null;
+        }
+    },
+
+    // SAVE: Update note with optimistic concurrency (checks updated_at)
+    async saveNoteWithConcurrency(carId, noteData, expectedUpdatedAt = null) {
+        if (!await SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured', conflict: false };
+        }
+
+        try {
+            const now = new Date().toISOString();
+            const updatePayload = {
                 text: noteData.text,
                 color: noteData.color,
-                updated_at: noteData.updatedAt
+                updated_at: now
             };
 
-            // First, try to UPDATE existing note
-            const updateUrl = `${SupabaseClient.url}/rest/v1/car_notes?car_id=eq.${encodeURIComponent(carId)}`;
+            // Try UPDATE first
+            let updateUrl = `${SupabaseClient.url}/rest/v1/car_notes?car_id=eq.${encodeURIComponent(carId)}`;
+
+            // If we have an expected updated_at, add conflict detection
+            if (expectedUpdatedAt) {
+                updateUrl += `&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`;
+            }
+
             const updateResponse = await fetch(updateUrl, {
                 method: 'PATCH',
                 headers: {
@@ -129,7 +223,7 @@ const SupabaseSync = {
                     'Content-Type': 'application/json',
                     'Prefer': 'return=representation'
                 },
-                body: JSON.stringify(row)
+                body: JSON.stringify(updatePayload)
             });
 
             if (!updateResponse.ok) {
@@ -137,19 +231,24 @@ const SupabaseSync = {
             }
 
             const updatedRows = await updateResponse.json();
-            
-            // If update successful and rows affected, we're done
+
+            // If update successful (rows affected)
             if (Array.isArray(updatedRows) && updatedRows.length > 0) {
-                return { success: true };
+                return {
+                    success: true,
+                    conflict: false,
+                    updatedAt: now
+                };
             }
 
-            // Otherwise, INSERT as new note
-            const insertRow = {
+            // No rows updated = conflict (expectedUpdatedAt doesn't match)
+            // Try INSERT for new notes
+            const insertPayload = {
                 car_id: carId,
                 text: noteData.text,
                 color: noteData.color,
-                created_at: noteData.createdAt,
-                updated_at: noteData.updatedAt
+                created_at: noteData.createdAt || now,
+                updated_at: now
             };
 
             const insertUrl = `${SupabaseClient.url}/rest/v1/car_notes`;
@@ -160,22 +259,43 @@ const SupabaseSync = {
                     'Content-Type': 'application/json',
                     'Prefer': 'return=minimal'
                 },
-                body: JSON.stringify([insertRow])
+                body: JSON.stringify([insertPayload])
             });
 
             if (!insertResponse.ok) {
                 const error = await insertResponse.text();
+                // If it's a duplicate key error and we had an expectedUpdatedAt, it's a conflict
+                if (error.includes('duplicate') && expectedUpdatedAt) {
+                    return {
+                        success: false,
+                        conflict: true,
+                        error: 'Note was modified elsewhere. Reload to see latest version.'
+                    };
+                }
                 throw new Error(`HTTP ${insertResponse.status}: ${error}`);
             }
 
-            return { success: true };
+            return {
+                success: true,
+                conflict: false,
+                updatedAt: now
+            };
         } catch (error) {
-            console.error('❌ Supabase sync error:', error);
-            return { success: false, error: error.message };
+            console.error('❌ Supabase save error:', error);
+            return {
+                success: false,
+                conflict: false,
+                error: error.message
+            };
         }
     },
 
-    // Delete note from Supabase
+    // SAVE: Quick save without conflict detection (for new notes)
+    async syncNoteToSupabase(carId, noteData) {
+        return SupabaseSync.saveNoteWithConcurrency(carId, noteData, null);
+    },
+
+    // DELETE: Remove note from DB
     async deleteNoteFromSupabase(carId) {
         if (!await SupabaseClient.isReady()) {
             return { success: false, reason: 'not_configured' };
@@ -200,115 +320,6 @@ const SupabaseSync = {
         } catch (error) {
             console.error('❌ Supabase delete error:', error);
             return { success: false, error: error.message };
-        }
-    },
-
-    // Pull all notes from Supabase
-    async pullNotesFromSupabase() {
-        if (!await SupabaseClient.isReady()) {
-            return null;
-        }
-
-        try {
-            const url = `${SupabaseClient.url}/rest/v1/car_notes`;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'apikey': SupabaseClient.key,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            const notes = {};
-            if (Array.isArray(data)) {
-                data.forEach(row => {
-                    notes[row.car_id] = {
-                        text: row.text,
-                        color: row.color,
-                        createdAt: row.created_at,
-                        updatedAt: row.updated_at
-                    };
-                });
-            }
-
-            return notes;
-        } catch (error) {
-            console.error('❌ Supabase pull error:', error);
-            return null;
-        }
-    },
-
-    // Sync all local notes to Supabase
-    async pushAllNotesToSupabase(notes) {
-        if (!await SupabaseClient.isReady()) {
-            return { success: false, reason: 'not_configured' };
-        }
-
-        try {
-            const carIds = Object.keys(notes);
-            
-            if (carIds.length === 0) {
-                return { success: true, count: 0 };
-            }
-
-            let syncedCount = 0;
-
-            // Sync each note individually (UPDATE or INSERT)
-            for (const carId of carIds) {
-                const result = await SupabaseSync.syncNoteToSupabase(carId, notes[carId]);
-                if (result.success) {
-                    syncedCount++;
-                }
-            }
-
-            return { success: true, count: syncedCount };
-        } catch (error) {
-            console.error('❌ Supabase batch push error:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Merge remote notes with local (local takes priority for conflicts)
-    async syncBidirectional() {
-        if (!await SupabaseClient.isReady()) {
-            return null;
-        }
-
-        try {
-            // Get local notes
-            const localNotes = await new Promise((resolve) => {
-                chrome.storage.local.get(['carNotes'], (result) => {
-                    resolve(result.carNotes || {});
-                });
-            });
-
-            // Get remote notes
-            const remoteNotes = await SupabaseSync.pullNotesFromSupabase();
-            if (!remoteNotes) {
-                return localNotes;
-            }
-
-            // Merge: local takes priority, add missing remote notes
-            const merged = { ...remoteNotes, ...localNotes };
-
-            // Save merged back to local
-            await new Promise((resolve) => {
-                chrome.storage.local.set({ carNotes: merged }, resolve);
-            });
-
-            // Push all to remote
-            await SupabaseSync.pushAllNotesToSupabase(merged);
-
-            return merged;
-        } catch (error) {
-            console.error('❌ Bidirectional sync error:', error);
-            return null;
         }
     }
 };
