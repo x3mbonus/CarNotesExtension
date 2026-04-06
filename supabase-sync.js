@@ -115,6 +115,36 @@ const SupabaseSync = {
 
         try {
             const row = {
+                text: noteData.text,
+                color: noteData.color,
+                updated_at: noteData.updatedAt
+            };
+
+            // First, try to UPDATE existing note
+            const updateUrl = `${SupabaseClient.url}/rest/v1/car_notes?car_id=eq.${encodeURIComponent(carId)}`;
+            const updateResponse = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': SupabaseClient.key,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(row)
+            });
+
+            if (!updateResponse.ok) {
+                throw new Error(`HTTP ${updateResponse.status}`);
+            }
+
+            const updatedRows = await updateResponse.json();
+            
+            // If update successful and rows affected, we're done
+            if (Array.isArray(updatedRows) && updatedRows.length > 0) {
+                return { success: true };
+            }
+
+            // Otherwise, INSERT as new note
+            const insertRow = {
                 car_id: carId,
                 text: noteData.text,
                 color: noteData.color,
@@ -122,21 +152,20 @@ const SupabaseSync = {
                 updated_at: noteData.updatedAt
             };
 
-            // Use REST API to upsert (POST with on_conflict)
-            const url = `${SupabaseClient.url}/rest/v1/car_notes?on_conflict=car_id`;
-            const response = await fetch(url, {
+            const insertUrl = `${SupabaseClient.url}/rest/v1/car_notes`;
+            const insertResponse = await fetch(insertUrl, {
                 method: 'POST',
                 headers: {
                     'apikey': SupabaseClient.key,
                     'Content-Type': 'application/json',
                     'Prefer': 'return=minimal'
                 },
-                body: JSON.stringify([row])
+                body: JSON.stringify([insertRow])
             });
 
-            if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`HTTP ${response.status}: ${error}`);
+            if (!insertResponse.ok) {
+                const error = await insertResponse.text();
+                throw new Error(`HTTP ${insertResponse.status}: ${error}`);
             }
 
             return { success: true };
@@ -222,31 +251,23 @@ const SupabaseSync = {
         }
 
         try {
-            const rows = Object.entries(notes).map(([carId, noteData]) => ({
-                car_id: carId,
-                text: noteData.text,
-                color: noteData.color,
-                created_at: noteData.createdAt,
-                updated_at: noteData.updatedAt
-            }));
-
-            const url = `${SupabaseClient.url}/rest/v1/car_notes?on_conflict=car_id`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'apikey': SupabaseClient.key,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                },
-                body: JSON.stringify(rows)
-            });
-
-            if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`HTTP ${response.status}: ${error}`);
+            const carIds = Object.keys(notes);
+            
+            if (carIds.length === 0) {
+                return { success: true, count: 0 };
             }
 
-            return { success: true, count: rows.length };
+            let syncedCount = 0;
+
+            // Sync each note individually (UPDATE or INSERT)
+            for (const carId of carIds) {
+                const result = await SupabaseSync.syncNoteToSupabase(carId, notes[carId]);
+                if (result.success) {
+                    syncedCount++;
+                }
+            }
+
+            return { success: true, count: syncedCount };
         } catch (error) {
             console.error('❌ Supabase batch push error:', error);
             return { success: false, error: error.message };
