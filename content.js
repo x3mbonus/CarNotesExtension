@@ -21,6 +21,20 @@ async function initializeContentScript() {
     const pathname = window.location.pathname;
     const search = window.location.search;
 
+    // Try to sync with Supabase on page load
+    if (typeof SupabaseSync !== 'undefined') {
+        const autoSync = await new Promise(res => {
+            chrome.storage.local.get(['autoSync'], r => {
+                res(r.autoSync !== false);
+            });
+        });
+        if (autoSync) {
+            SupabaseSync.syncBidirectional().catch(err => {
+                console.warn('Initial Supabase sync failed (continuing with local storage):', err);
+            });
+        }
+    }
+
     // Check if it's a detail page
     // Mobile.de: /fahrzeuge/details.html, /auto-inserat/, or language versions like /ru/..../подробности.html
     const isMobileDeDetail = hostname.includes('mobile.de') &&
@@ -523,7 +537,7 @@ async function getNote(carId) {
 // Save note to storage
 async function saveNoteToStorage(carId, text, color) {
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['carNotes'], (result) => {
+        chrome.storage.local.get(['carNotes'], async (result) => {
             const notes = result.carNotes || {};
             notes[carId] = {
                 text: text,
@@ -531,10 +545,23 @@ async function saveNoteToStorage(carId, text, color) {
                 createdAt: notes[carId]?.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
-            chrome.storage.local.set({ carNotes: notes }, () => {
+            chrome.storage.local.set({ carNotes: notes }, async () => {
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
                 } else {
+                    // Sync to Supabase if configured
+                    if (typeof SupabaseSync !== 'undefined') {
+                        const autoSync = await new Promise(res => {
+                            chrome.storage.local.get(['autoSync'], r => {
+                                res(r.autoSync !== false);
+                            });
+                        });
+                        if (autoSync) {
+                            SupabaseSync.syncNoteToSupabase(carId, notes[carId]).catch(err => {
+                                console.warn('Supabase sync failed (using local storage):', err);
+                            });
+                        }
+                    }
                     resolve();
                 }
             });
@@ -545,13 +572,26 @@ async function saveNoteToStorage(carId, text, color) {
 // Delete note from storage
 async function deleteNoteFromStorage(carId) {
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(['carNotes'], (result) => {
+        chrome.storage.local.get(['carNotes'], async (result) => {
             const notes = result.carNotes || {};
             delete notes[carId];
-            chrome.storage.local.set({ carNotes: notes }, () => {
+            chrome.storage.local.set({ carNotes: notes }, async () => {
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
                 } else {
+                    // Sync deletion to Supabase if configured
+                    if (typeof SupabaseSync !== 'undefined') {
+                        const autoSync = await new Promise(res => {
+                            chrome.storage.local.get(['autoSync'], r => {
+                                res(r.autoSync !== false);
+                            });
+                        });
+                        if (autoSync) {
+                            SupabaseSync.deleteNoteFromSupabase(carId).catch(err => {
+                                console.warn('Supabase delete failed (using local storage):', err);
+                            });
+                        }
+                    }
                     resolve();
                 }
             });

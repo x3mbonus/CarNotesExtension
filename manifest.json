@@ -4,14 +4,20 @@
   "version": "1.0.0",
   "description": "Add colored notes to car listings on mobile.de and otomoto.pl",
   "permissions": ["storage", "scripting"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline';"
+  },
   "host_permissions": [
     "https://mobile.de/*",
     "https://www.mobile.de/*",
     "https://otomoto.pl/*",
     "https://www.otomoto.pl/*",
     "https://*.mobile.de/*",
-    "https://*.otomoto.pl/*"
+    "https://*.otomoto.pl/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://*.supabase.co/*"
   ],
+  "options_page": "options.html",
   "action": {
     "default_popup": "popup.html",
     "default_title": "Car Notes"
@@ -26,7 +32,7 @@
         "https://*.mobile.de/*",
         "https://*.otomoto.pl/*"
       ],
-      "js": ["vehicle-extractor-simple.js", "content.js"],
+      "js": ["supabase-sync.js", "vehicle-extractor-simple.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

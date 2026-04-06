@@ -40,6 +40,10 @@ document.getElementById('importBtn').addEventListener('click', () => {
     });
 });
 
+document.getElementById('settingsBtn').addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+});
+
 function showStatus(message, type) {
     const statusEl = document.getElementById('status');
     statusEl.textContent = message;

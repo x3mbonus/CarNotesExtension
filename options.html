@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Notes - Settings</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title.success {
+            color: #28a745;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #999;
+            margin-top: -8px;
+            margin-bottom: 16px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .message {
+            padding: 12px 14px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+
+        .divider {
+            height: 1px;
+            background: #eee;
+            margin: 30px 0;
+        }
+
+        .info-box {
+            background: #f7f7f7;
+            border-left: 4px solid #667eea;
+            padding: 12px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-label {
+            font-weight: normal;
+            margin: 0;
+            cursor: pointer;
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Car Notes Settings</h1>
+        <p class="subtitle">Configure cloud sync with Supabase</p>
+
+        <div id="message" class="message"></div>
+
+        <!-- Status Section -->
+        <div class="section">
+            <div class="section-title" id="statusTitle">
+                <span class="status-indicator" id="statusIndicator"></span>
+                Not Connected
+            </div>
+            <p class="help-text" id="statusText">Configure Supabase to enable cloud sync across devices</p>
+        </div>
+
+        <!-- Supabase Config -->
+        <div class="section">
+            <h3 class="section-title">Supabase Configuration</h3>
+
+            <label for="supabaseUrl">Project URL</label>
+            <input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co">
+            <p class="help-text">Found in Supabase Settings → API</p>
+
+            <label for="supabaseKey">Anon Public Key</label>
+            <input type="password" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
+            <p class="help-text">Copy from Supabase Settings → API (public key)</p>
+
+            <div class="info-box">
+                📚 Need help? See <a href="https://supabase.com/docs/guides/getting-started" target="_blank">Supabase Setup Guide</a>
+            </div>
+
+            <button class="btn-primary" id="saveBtn">✓ Save Configuration</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Sync Options -->
+        <div class="section">
+            <h3 class="section-title">Sync Options</h3>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="autoSync" checked>
+                <label for="autoSync" class="checkbox-label">Auto-sync notes to cloud</label>
+            </div>
+
+            <button class="btn-secondary" id="syncBtn">⬆️ Sync Now</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Danger Zone -->
+        <div class="section">
+            <h3 class="section-title">Dangerous Zone</h3>
+
+            <button class="btn-danger" id="clearBtn">🗑️ Clear Configuration</button>
+            <p class="help-text">Removes Supabase settings but keeps local notes</p>
+        </div>
+    </div>
+
+    <script src="supabase-sync.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>
