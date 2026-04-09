@@ -17,9 +17,9 @@
     "https://cdn.jsdelivr.net/*",
     "https://*.supabase.co/*"
   ],
-  "options_page": "options.html",
+  "options_page": "src/popup/options.html",
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_title": "Car Notes"
   },
   "content_scripts": [
@@ -32,8 +32,8 @@
         "https://*.mobile.de/*",
         "https://*.otomoto.pl/*"
       ],
-      "js": ["supabase-sync.js", "vehicle-extractor-simple.js", "content.js"],
-      "css": ["content.css"],
+      "js": ["src/background/supabase-sync.js", "src/content/utils.js", "src/content/vehicle-extractor-simple.js", "src/content/router.js", "src/content/handlers.js", "src/content/sites/mobile-de.js", "src/content/sites/otomoto.js", "src/content/content.js"],
+      "css": ["src/styles/content.css"],
       "run_at": "document_idle"
     }
   ]

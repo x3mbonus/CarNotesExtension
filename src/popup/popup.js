@@ -55,4 +55,3 @@ function showStatus(message, type) {
         statusEl.className = 'status';
     }, 3000);
 }
-

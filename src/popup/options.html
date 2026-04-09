@@ -206,88 +206,79 @@
             text-decoration: underline;
         }
 
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-
         input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
+            margin-right: 8px;
         }
 
         .checkbox-label {
-            font-weight: normal;
-            margin: 0;
-            cursor: pointer;
-            flex: 1;
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🚗 Car Notes Settings</h1>
-        <p class="subtitle">Configure cloud sync with Supabase</p>
+        <p class="subtitle">Configure Supabase to sync your notes across devices</p>
 
         <div id="message" class="message"></div>
 
-        <!-- Status Section -->
         <div class="section">
             <div class="section-title" id="statusTitle">
                 <span class="status-indicator" id="statusIndicator"></span>
                 Not Connected
             </div>
-            <p class="help-text" id="statusText">Configure Supabase to enable cloud sync across devices</p>
+            <p id="statusText" class="help-text">Configure Supabase to enable cloud sync</p>
         </div>
 
-        <!-- Supabase Config -->
         <div class="section">
-            <h3 class="section-title">Supabase Configuration</h3>
+            <h2 style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">🔑 Supabase Credentials</h2>
 
-            <label for="supabaseUrl">Project URL</label>
-            <input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co">
-            <p class="help-text">Found in Supabase Settings → API</p>
+            <label for="supabaseUrl">Supabase Project URL</label>
+            <input
+                type="text"
+                id="supabaseUrl"
+                placeholder="https://xxxxx.supabase.co"
+            >
+            <p class="help-text">Find at Settings → API in Supabase dashboard</p>
 
             <label for="supabaseKey">Anon Public Key</label>
-            <input type="password" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
-            <p class="help-text">Copy from Supabase Settings → API (public key)</p>
+            <input
+                type="password"
+                id="supabaseKey"
+                placeholder="eyJhb..."
+            >
+            <p class="help-text">Find at Settings → API → Project API Keys</p>
 
-            <div class="info-box">
-                📚 Need help? See <a href="https://supabase.com/docs/guides/getting-started" target="_blank">Supabase Setup Guide</a>
+            <div class="button-group">
+                <button id="saveBtn" class="btn-primary">✅ Save & Test</button>
+                <button id="syncBtn" class="btn-secondary">🔄 Sync Now</button>
             </div>
-
-            <button class="btn-primary" id="saveBtn">✓ Save Configuration</button>
         </div>
 
         <div class="divider"></div>
 
-        <!-- Sync Options -->
         <div class="section">
-            <h3 class="section-title">Sync Options</h3>
+            <h2 style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">⚙️ Advanced Options</h2>
 
-            <div class="checkbox-group">
+            <div class="checkbox-label">
                 <input type="checkbox" id="autoSync" checked>
-                <label for="autoSync" class="checkbox-label">Auto-sync notes to cloud</label>
+                <label for="autoSync" style="margin: 0;">Auto-sync notes when they change</label>
             </div>
 
-            <button class="btn-secondary" id="syncBtn">⬆️ Sync Now</button>
+            <div class="button-group">
+                <button id="clearBtn" class="btn-danger">🗑️ Clear Credentials</button>
+            </div>
         </div>
 
-        <div class="divider"></div>
-
-        <!-- Danger Zone -->
-        <div class="section">
-            <h3 class="section-title">Dangerous Zone</h3>
-
-            <button class="btn-danger" id="clearBtn">🗑️ Clear Configuration</button>
-            <p class="help-text">Removes Supabase settings but keeps local notes</p>
+        <div class="info-box">
+            💡 <strong>Tip:</strong> Notes are stored locally first, then synced to Supabase. You'll always have access to your notes even if sync fails.
         </div>
     </div>
 
-    <script src="supabase-sync.js"></script>
+    <script src="../styles/content.css"></script>
+    <script src="../background/supabase-sync.js"></script>
     <script src="options.js"></script>
 </body>
 </html>
