@@ -262,7 +262,12 @@ function showNoteModal(carId, existingNote, article) {
 
         if (result.success) {
             closeModal();
-            // Reinitialize to show the newly saved note
+
+            // Remove old note displays so they get recreated with fresh data
+            document.querySelector(`[data-car-id="${carId}"].car-note-display`)?.remove();
+            document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`)?.remove();
+
+            // Reinitialize to show the newly saved note with updated content
             initializeContentScript();
         }
     });
@@ -278,6 +283,14 @@ function showNoteModal(carId, existingNote, article) {
                 if (typeof SupabaseSync !== 'undefined') {
                     await SupabaseSync.deleteNoteFromSupabase(carId);
                 }
+
+                // Update cache - remove the note
+                delete notesCache[carId];
+
+                // Remove displays
+                document.querySelector(`[data-car-id="${carId}"].car-note-display`)?.remove();
+                document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`)?.remove();
+
                 closeModal();
                 initializeContentScript();
             }

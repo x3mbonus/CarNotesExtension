@@ -32,7 +32,19 @@ async function getNote(carId) {
 async function saveNote(carId, noteData) {
     // Save note to database
     if (typeof SupabaseSync !== 'undefined') {
-        return await SupabaseSync.syncNoteToSupabase(carId, noteData);
+        const result = await SupabaseSync.syncNoteToSupabase(carId, noteData);
+
+        // Update local cache with the saved note
+        if (result.success) {
+            notesCache[carId] = {
+                text: noteData.text,
+                color: noteData.color,
+                createdAt: noteData.createdAt,
+                updatedAt: new Date().toISOString()
+            };
+        }
+
+        return result;
     }
     return { success: false };
 }
