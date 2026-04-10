@@ -54,8 +54,19 @@ async function saveNote(carId, noteData) {
             sort: noteData.sort !== undefined ? noteData.sort : null,
             confirmed: noteData.confirmed || false,
             featuresSource: 'manual'
+        },
+        {
+            seat_type: noteData.seat_type,
+            climate: noteData.climate,
+            owners: noteData.owners,
+            tow_hitch_type: noteData.tow_hitch_type
         }
     );
+
+    // If note save succeeded and we have features, save them to car_features table
+    if (result.success && noteData.features && Object.keys(noteData.features).length > 0) {
+        await window.SupabaseApi.saveCarFeaturesNew(carId, noteData.features);
+    }
 
     // Update local cache with the saved note
     if (result.success) {

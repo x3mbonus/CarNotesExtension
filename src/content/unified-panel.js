@@ -7,6 +7,11 @@ window.CarDetailPanel = {
     currentSort: -1,  // -1 = excluded, 0-3 = sort levels
     currentNote: '',
     currentColor: '#FFEB3B',
+    // Metadata fields
+    currentSeatType: '',
+    currentClimate: '',
+    currentOwners: '',
+    currentTowHitchType: '',
     panelElement: null,
     isExpanded: true,
     isInitializing: false,  // Prevent duplicate initialization
@@ -49,11 +54,11 @@ window.CarDetailPanel = {
             this.isVerified = featureState?.confirmed || false;
             this.currentSort = featureState?.sort ?? null;  // null = no rating, not -1
 
-            // If features were parsed (not from DB), save them automatically
-            if (!featureState?.isFromDb && featureState?.featuresSource === 'parsed') {
-                console.log('[CarDetailPanel] Auto-saving parsed features on first open...');
+            // If features were not loaded from DB, save them automatically on first visit
+            if (!featureState?.isFromDb) {
+                console.log('[CarDetailPanel] Auto-saving features on first visit (source:', featureState?.featuresSource, ', count:', Object.keys(this.currentFeatures).length, ')');
                 await window.FeaturesManager?.confirmAllFeatures?.(carId, this.currentFeatures, this.currentSort, false);
-                console.log('[CarDetailPanel] Parsed features auto-saved');
+                console.log('[CarDetailPanel] Features auto-saved to DB');
             }
 
             // If verified and sort is set, update note color to match sort level
@@ -78,7 +83,12 @@ window.CarDetailPanel = {
             if (noteData) {
                 this.currentNote = noteData.text || '';
                 this.currentColor = noteData.color || '#FFEB3B';
-                console.log('✅ Note loaded');
+                // Load metadata from note data
+                this.currentSeatType = noteData.seat_type || '';
+                this.currentClimate = noteData.climate || '';
+                this.currentOwners = noteData.owners || '';
+                this.currentTowHitchType = noteData.tow_hitch_type || '';
+                console.log('✅ Note and metadata loaded');
             }
         } catch (error) {
             console.error('❌ Error loading note:', error);
@@ -88,6 +98,7 @@ window.CarDetailPanel = {
         this.updateNoteSection();
         this.updateSortSection();
         this.updateVerifiedSection();
+        this.updateMetadataSection();
         this.updateFeaturesSection();
         this.updateExportSection();
 
@@ -228,6 +239,12 @@ window.CarDetailPanel = {
         verifiedSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
         content.appendChild(verifiedSection);
 
+        // Section 3.5: Metadata (Seat Type, Climate, Owners, Tow Hitch Type)
+        const metadataSection = document.createElement('div');
+        metadataSection.id = 'unified-metadata-section';
+        metadataSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
+        content.appendChild(metadataSection);
+
         // Section 4: Features
         const featuresSection = document.createElement('div');
         featuresSection.id = 'unified-features-section';
@@ -306,6 +323,47 @@ window.CarDetailPanel = {
 
         section.appendChild(btn);
         console.log('✅ Verified section updated');
+    },
+
+    /**
+     * Update metadata section
+     */
+    updateMetadataSection() {
+        const section = document.getElementById('unified-metadata-section');
+        if (!section) {
+            console.warn('⚠️ Metadata section not found');
+            return;
+        }
+
+        section.innerHTML = '';
+
+        // Prepare metadata object
+        const metadata = {
+            seat_type: this.currentSeatType || '',
+            climate: this.currentClimate || '',
+            owners: this.currentOwners || '',
+            tow_hitch_type: this.currentTowHitchType || ''
+        };
+
+        section.appendChild(window.UIComponents.createMetadataSection(
+            metadata,
+            async (updatedMeta) => {
+                // Update local state
+                Object.assign({
+                    seat_type: this.currentSeatType,
+                    climate: this.currentClimate,
+                    owners: this.currentOwners,
+                    tow_hitch_type: this.currentTowHitchType
+                }, updatedMeta);
+
+                // Save to DB
+                await window.SupabaseApi?.updateCarMetadata?.(
+                    this.currentCarId,
+                    updatedMeta
+                );
+            }
+        ));
+        console.log('✅ Metadata section updated');
     },
 
     /**
@@ -454,7 +512,69 @@ window.CarDetailPanel = {
         console.log('[updateFeaturesSection] Starting, currentFeatures has', Object.keys(this.currentFeatures || {}).length, 'features');
 
         section.innerHTML = '';
-        section.appendChild(window.UIComponents.createSectionLabel('FEATURES'));
+
+        // Create header with label and reparse button
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+
+        header.appendChild(window.UIComponents.createSectionLabel('FEATURES'));
+
+        // Add reparse button
+        const reparseBtn = document.createElement('button');
+        reparseBtn.textContent = '↻ Re-parse';
+        reparseBtn.style.cssText = `
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f0f0f0;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+        `;
+        reparseBtn.onmouseover = () => reparseBtn.style.background = '#e0e0e0';
+        reparseBtn.onmouseout = () => reparseBtn.style.background = '#f0f0f0';
+
+        reparseBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (confirm('Re-parse features from site? This will overwrite current selections.')) {
+                try {
+                    console.log('[CarDetailPanel] Re-parsing features...');
+                    const parsed = window.FeaturesParser?.parseFeatures?.() || {};
+                    const featureConfig = await window.FeaturesManager?.getFeatureConfig?.();
+                    const nameToKey = {};
+                    featureConfig?.forEach(fc => {
+                        nameToKey[fc.name_uk] = fc.key;
+                    });
+
+                    // Convert feature names to keys and update state
+                    Object.entries(parsed).forEach(([featureName, isPresent]) => {
+                        const key = nameToKey[featureName] ||
+                            (window.FeatureColumnMapper?.featureToColumnName?.(featureName)) ||
+                            'feature_' + featureName.toLowerCase().replace(/\s+/g, '_');
+                        this.currentFeatures[key] = isPresent ? true : null;
+                    });
+
+                    // Save to DB and refresh display
+                    await window.FeaturesManager?.saveFeatures?.(
+                        this.currentCarId,
+                        this.currentFeatures,
+                        this.currentSort,
+                        this.isVerified
+                    );
+
+                    this.updateFeaturesSection();
+                    console.log('[CarDetailPanel] Features re-parsed and saved successfully');
+                } catch (error) {
+                    console.error('[CarDetailPanel] Error re-parsing features:', error);
+                    alert('Error re-parsing features: ' + error.message);
+                }
+            }
+        };
+
+        header.appendChild(reparseBtn);
+        section.appendChild(header);
 
         // Defensive: ensure currentFeatures is initialized
         if (!this.currentFeatures || Object.keys(this.currentFeatures).length === 0) {
@@ -474,9 +594,13 @@ window.CarDetailPanel = {
             window.UIComponents.getFeaturesList(),
             this.currentFeatures,
             async (featureKey) => {
-                this.currentFeatures[featureKey] = !this.currentFeatures[featureKey];
+                // Toggle through 3 states: true → null → false → true
+                const currentState = this.currentFeatures[featureKey];
+                const nextState = window.FeaturesManager?.toggleFeatureState?.(currentState);
+
+                this.currentFeatures[featureKey] = nextState;
                 const featureLabel = window.UIComponents.getFeaturesList().find(f => f.key === featureKey)?.label || featureKey;
-                console.log(`[CarDetailPanel] Feature ${featureLabel} toggled to:`, this.currentFeatures[featureKey]);
+                console.log(`[CarDetailPanel] Feature ${featureLabel} toggled to:`, nextState);
 
                 // Save to DB
                 await window.FeaturesManager?.saveFeatures?.(

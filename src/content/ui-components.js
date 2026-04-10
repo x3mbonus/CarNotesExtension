@@ -95,7 +95,7 @@ window.UIComponents = {
         return btn;
     },
 
-    // Render features grid
+// Render features grid with 3-state toggle (true, null, false)
     createFeaturesGrid(featuresList, currentFeatures, onFeatureToggle) {
         const container = document.createElement('div');
         container.className = 'ui-features-grid';
@@ -105,11 +105,38 @@ window.UIComponents = {
             btn.className = 'ui-feature-btn';
             btn.setAttribute('data-feature', feature.key);
 
-            if (currentFeatures[feature.key]) {
+            const state = currentFeatures[feature.key];
+
+            if (state === true) {
                 btn.classList.add('active');
                 btn.textContent = `✓ ${feature.label}`;
+                btn.title = 'Click to cycle: Present → Unknown → Missing → Present';
+            } else if (state === false) {
+                // Missing state - color depends on priority
+                btn.textContent = `✗ ${feature.label}`;
+                if (feature.priority === 2) {
+                    // High priority: RED when missing
+                    btn.classList.add('missing');
+                } else if (feature.priority === 1) {
+                    // Medium priority: YELLOW when missing
+                    btn.classList.add('priority-medium-missing');
+                } else {
+                    // Low priority: WHITE when missing (same as unknown)
+                    btn.classList.add('priority-low-missing');
+                }
+                btn.title = 'Click to cycle: Present → Unknown → Missing → Present';
             } else {
+                // state === null (unknown)
                 btn.textContent = `? ${feature.label}`;
+                if (feature.priority === 2) {
+                    // High priority: RED when unknown
+                    btn.classList.add('priority-missing');
+                } else if (feature.priority === 1) {
+                    // Medium priority: WHITE when unknown
+                    btn.classList.add('priority-medium-unknown');
+                }
+                // Low priority: stays white (default)
+                btn.title = 'Click to cycle: Present → Unknown → Missing → Present';
             }
 
             if (onFeatureToggle) {
@@ -124,36 +151,99 @@ window.UIComponents = {
         return container;
     },
 
-    // Get standard features list
+    // Get standard features list - ordered by user preference
     getFeaturesList() {
         return [
-            { label: 'ACC', key: 'feature_acc' },
-            { label: 'Blind spot', key: 'feature_blind_spot' },
-            { label: 'Lane assist', key: 'feature_lane_assist' },
-            { label: 'Signs', key: 'feature_signs' },
-            { label: 'Rear traffic alert', key: 'feature_rear_traffic_alert' },
-            { label: 'Traffic Jam Assist', key: 'feature_traffic_jam_assist' },
-            { label: 'Keyless', key: 'feature_keyless' },
-            { label: 'Digital cockpit', key: 'feature_digital_cockpit' },
-            { label: 'Heated seats', key: 'feature_heated_seats' },
-            { label: 'Heated windshield', key: 'feature_heated_windshield' },
-            { label: 'Heated steering wheel', key: 'feature_heated_steering_wheel' },
-            { label: 'Massage seats', key: 'feature_massage_seats' },
-            { label: 'Memory seats', key: 'feature_memory_seats' },
-            { label: 'Android Auto / CarPlay', key: 'feature_android_auto_carplay' },
-            { label: 'HUD', key: 'feature_hud' },
-            { label: 'DCC', key: 'feature_dcc' },
-            { label: 'Matrix headlights', key: 'feature_matrix_headlights' },
-            { label: 'Camera', key: 'feature_camera' },
-            { label: 'Parking sensors', key: 'feature_parking_sensors' },
-            { label: '360 camera', key: 'feature_360_camera' },
-            { label: 'Auto parking', key: 'feature_auto_parking' },
-            { label: 'Panoramic roof', key: 'feature_panoramic_roof' },
-            { label: 'Electric tailgate', key: 'feature_electric_tailgate' },
-            { label: 'Auto tailgate', key: 'feature_auto_tailgate' },
-            { label: 'Tow hitch', key: 'feature_tow_hitch' },
-            { label: 'Webasto', key: 'feature_webasto' }
+            // HIGH priority features - show RED when not true
+            { label: 'ACC', key: 'feature_acc', priority: 2 },
+            { label: 'Android Auto / CarPlay', key: 'feature_android_auto_carplay', priority: 2 },
+            { label: 'Камера', key: 'feature_camera', priority: 2 },
+            { label: 'Парктроніки', key: 'feature_parking_sensors', priority: 2 },
+            { label: 'Blind spot', key: 'feature_blind_spot', priority: 2 },
+
+            // MEDIUM priority (normal priority) features
+            { label: 'Lane assist', key: 'feature_lane_assist', priority: 1 },
+            { label: 'Знаки', key: 'feature_signs', priority: 1 },
+
+            // LOW priority features
+            { label: 'Rear traffic alert', key: 'feature_rear_traffic_alert', priority: 0 },
+            { label: 'Traffic Jam Assist', key: 'feature_traffic_jam_assist', priority: 0 },
+
+            // MEDIUM priority (normal priority) features
+            { label: 'Keyless', key: 'feature_keyless', priority: 1 },
+            { label: 'Digital cockpit', key: 'feature_digital_cockpit', priority: 1 },
+            { label: 'Підігрів сидінь', key: 'feature_heated_seats', priority: 1 },
+
+            // LOW priority features
+            { label: 'Підігрів лобового', key: 'feature_heated_windshield', priority: 0 },
+            { label: 'Підігрів керма', key: 'feature_heated_steering_wheel', priority: 0 },
+
+            // MEDIUM priority (normal priority) features
+            { label: 'Масаж', key: 'feature_massage_seats', priority: 1 },
+
+            // LOW priority features
+            { label: 'Пам\'ять сидінь', key: 'feature_memory_seats', priority: 0 },
+            { label: 'DCC', key: 'feature_dcc', priority: 0 },
+            { label: 'Webasto', key: 'feature_webasto', priority: 0 },
+
+            // MEDIUM priority (normal priority) features
+            { label: 'Matrix', key: 'feature_matrix_headlights', priority: 1 },
+
+            // LOW priority features
+            { label: 'Автопаркування', key: 'feature_auto_parking', priority: 0 },
+            { label: '360 камера', key: 'feature_360_camera', priority: 0 },
+
+            // HIGH priority features - show RED when not true
+            { label: 'Фаркоп', key: 'feature_tow_hitch', priority: 2 },
+
+            // MEDIUM priority (normal priority) features
+            { label: 'Електробагажник', key: 'feature_electric_tailgate', priority: 1 },
+
+            // LOW priority features
+            { label: 'Автобагажник', key: 'feature_auto_tailgate', priority: 0 },
+            { label: 'Панорама', key: 'feature_panoramic_roof', priority: 0 },
+            { label: 'HUD', key: 'feature_hud', priority: 0 }
         ];
+    },
+
+    // Render metadata section (above features) - compact version with Ukrainian labels only
+    createMetadataSection(carData, onMetadataChange) {
+        const section = document.createElement('div');
+        section.className = 'ui-metadata-section';
+
+        const metadataFields = [
+            { label: 'Тип сидінь', key: 'seat_type', placeholder: 'Сидіння' },
+            { label: 'Клімат', key: 'climate', placeholder: 'Клімат' },
+            { label: 'Власників', key: 'owners', placeholder: 'Кількість' },
+            { label: 'Фаркоп тип', key: 'tow_hitch_type', placeholder: 'Тип' }
+        ];
+
+        metadataFields.forEach(field => {
+            const container = document.createElement('div');
+            container.className = 'ui-metadata-field';
+
+            const label = document.createElement('label');
+            label.className = 'ui-metadata-label';
+            label.textContent = field.label;
+            container.appendChild(label);
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'ui-metadata-input';
+            input.value = carData[field.key] || '';
+            input.placeholder = field.placeholder;
+
+            if (onMetadataChange) {
+                input.addEventListener('input', (e) => {
+                    onMetadataChange({ [field.key]: e.target.value });
+                });
+            }
+
+            container.appendChild(input);
+            section.appendChild(container);
+        });
+
+        return section;
     },
 
     // Get standard colors

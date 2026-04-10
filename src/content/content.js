@@ -86,20 +86,20 @@ async function addNoteButton(article, carId, dbNote = null) {
     const addBtn = noteDisplay.querySelector('.car-note-add-btn');
 
     if (editBtn) {
-        editBtn.addEventListener('click', (e) => {
+        editBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            showNoteModal(carId, note, article);
+            await showNoteModal(carId, note, article);
         });
     }
 
     if (addBtn) {
-        addBtn.addEventListener('click', (e) => {
+        addBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            showNoteModal(carId, null, article);
+            await showNoteModal(carId, null, article);
         });
     }
 }
@@ -118,7 +118,7 @@ function closeModal() {
     }
 }
 
-function showNoteModal(carId, existingNote, article) {
+async function showNoteModal(carId, existingNote, article) {
     // Remove existing modal if any
     if (currentModal) {
         currentModal.remove();
@@ -134,12 +134,32 @@ function showNoteModal(carId, existingNote, article) {
     modal.className = 'car-note-modal';
 
     // Initialize state from existing note or defaults
+    let features = existingNote?.features || {};
+    let metadata = {
+        seat_type: existingNote?.seat_type || '',
+        climate: existingNote?.climate || '',
+        owners: existingNote?.owners || '',
+        tow_hitch_type: existingNote?.tow_hitch_type || ''
+    };
+
+    // Load features from DB if not in existingNote
+    try {
+        const featureState = await window.FeaturesManager?.initializeFeatures?.(carId, article ? { frameText: article } : null);
+        if (featureState?.features) {
+            features = featureState.features;
+            console.log('[Modal] Loaded', Object.keys(features).length, 'features from DB');
+        }
+    } catch (error) {
+        console.warn('[Modal] Error loading features from DB:', error);
+    }
+
     const state = {
         color: existingNote?.color || '#607D8B',
         text: existingNote?.text || '',
         sort: existingNote?.sort ?? -1,
         confirmed: existingNote?.confirmed || false,
-        features: existingNote?.features || {}
+        features: features,
+        ...metadata
     };
 
     // Build modal HTML with header and content area (will fill with components)
@@ -216,15 +236,32 @@ function showNoteModal(carId, existingNote, article) {
     ));
     contentArea.appendChild(verifySection);
 
+    // ===== METADATA SECTION =====
+    const metadataSection = document.createElement('div');
+    metadataSection.className = 'modal-section';
+    metadataSection.appendChild(window.UIComponents.createMetadataSection(
+        state,
+        (updatedMeta) => {
+            Object.assign(state, updatedMeta);
+        }
+    ));
+    contentArea.appendChild(metadataSection);
+
     // ===== FEATURES SECTION =====
     const featuresSection = document.createElement('div');
     featuresSection.className = 'modal-section';
-    featuresSection.appendChild(window.UIComponents.createSectionLabel('FEATURES'));
+
+    const featuresLabel = window.UIComponents.createSectionLabel('FEATURES');
+    featuresSection.appendChild(featuresLabel);
+
     featuresSection.appendChild(window.UIComponents.createFeaturesGrid(
         window.UIComponents.getFeaturesList(),
         state.features,
         (featureKey) => {
-            state.features[featureKey] = !state.features[featureKey];
+            // Toggle through 3 states: true → null → false → true
+            const currentState = state.features[featureKey];
+            const nextState = window.FeaturesManager?.toggleFeatureState?.(currentState);
+            state.features[featureKey] = nextState;
         }
     ));
     contentArea.appendChild(featuresSection);
@@ -248,7 +285,11 @@ function showNoteModal(carId, existingNote, article) {
             createdAt: existingNote?.createdAt || new Date().toISOString(),
             sort: state.sort,
             confirmed: state.confirmed,
-            features: state.features
+            features: state.features,
+            seat_type: state.seat_type,
+            climate: state.climate,
+            owners: state.owners,
+            tow_hitch_type: state.tow_hitch_type
         });
 
         if (noteResult.success) {

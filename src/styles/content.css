@@ -118,6 +118,84 @@
     font-weight: 600;
 }
 
+.ui-feature-btn.missing {
+    border-color: #F44336;
+    background: #FFEBEE;
+    color: #C62828;
+    font-weight: 600;
+}
+
+/* High priority features when not true (priority-missing) - show RED */
+.ui-feature-btn.priority-missing {
+    border-color: #F44336;
+    background: #FFCDD2;
+    color: #C62828;
+    font-weight: 600;
+}
+
+/* Medium priority features when missing - show YELLOW */
+.ui-feature-btn.priority-medium-missing {
+    border-color: #FBC02D;
+    background: #FFF9C4;
+    color: #F57F17;
+    font-weight: 600;
+}
+
+/* Medium priority features when unknown - show WHITE */
+.ui-feature-btn.priority-medium-unknown {
+    border-color: #ddd;
+    background: #f5f5f5;
+    color: #666;
+}
+
+/* Low priority features when missing - show WHITE */
+.ui-feature-btn.priority-low-missing {
+    border-color: #ddd;
+    background: #f5f5f5;
+    color: #666;
+}
+
+/* Metadata section styles */
+.ui-metadata-section {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.ui-metadata-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ui-metadata-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ui-metadata-input {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    background: white;
+}
+
+.ui-metadata-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
 /* Car Notes Display Styles */
 
 .car-note-display {
