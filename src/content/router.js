@@ -67,5 +67,30 @@ window.SiteRouter = {
             // Listing page - multiple vehicles
             await adapter.handleListingPage();
         }
+    },
+
+    /**
+     * Get car ID from current page
+     */
+    async getCarId() {
+        const hostname = window.location.hostname;
+        const pathname = window.location.pathname;
+        const search = window.location.search;
+
+        const platform = this.detectPlatform(hostname);
+        const adapter = this.getAdapter(platform);
+
+        if (!adapter) {
+            return null;
+        }
+
+        // Try to extract ID from current page
+        if (adapter.extractDetailId) {
+            return await adapter.extractDetailId(pathname, search);
+        } else if (adapter.extractId) {
+            return await adapter.extractId(pathname, search);
+        }
+
+        return null;
     }
 };

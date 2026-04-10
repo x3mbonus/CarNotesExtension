@@ -141,8 +141,8 @@ window.OtomotoAdapter = {
      */
     async handleDetailPage(pathname, search) {
         const carId = this.extractDetailId(pathname);
-        if (carId) {
-            await addNoteButtonDetail(carId);
+        if (carId && window.UnifiedPanel) {
+            window.UnifiedPanel.showPanel(carId);
         }
     }
 };

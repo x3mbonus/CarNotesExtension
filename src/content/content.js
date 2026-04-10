@@ -98,61 +98,9 @@ async function addNoteButton(article, carId, dbNote = null) {
 }
 
 async function addNoteButtonDetail(carId) {
-    // For detail pages - use fixed positioning in top-right
-
-    // Check if note display already exists for this car
-    const existingDisplay = document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`);
-    if (existingDisplay) {
-        return; // Already added, don't create duplicate
-    }
-
-    const note = await getNote(carId);
-
-    // Create the note display container
-    const noteDisplay = document.createElement('div');
-    noteDisplay.className = 'car-note-display-detail';
-    noteDisplay.setAttribute('data-car-id', carId);
-
-    if (note) {
-        // Display the note
-        const textColor = getTextColorForBackground(note.color);
-        noteDisplay.innerHTML = `
-            <div class="car-note-content" style="background-color: ${note.color}; color: ${textColor};">
-                <div class="car-note-text">${escapeHtml(note.text)}</div>
-                <button type="button" class="car-note-edit-btn" data-car-id="${carId}" title="Edit note">✏️</button>
-            </div>
-        `;
-    } else {
-        // Display empty state with pencil button
-        noteDisplay.innerHTML = `
-            <button type="button" class="car-note-add-btn" data-car-id="${carId}" title="Add note">✏️</button>
-        `;
-    }
-
-    // Add to page body with fixed positioning
-    document.body.appendChild(noteDisplay);
-
-    // Attach event listeners
-    const editBtn = noteDisplay.querySelector('.car-note-edit-btn');
-    const addBtn = noteDisplay.querySelector('.car-note-add-btn');
-
-    if (editBtn) {
-        editBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            showNoteModal(carId, note, null);
-        });
-    }
-
-    if (addBtn) {
-        addBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            showNoteModal(carId, null, null);
-        });
-    }
+    // DISABLED: No longer needed on detail pages, unified panel handles all note editing
+    console.log('ℹ️ Detail page note button disabled (using unified panel instead)');
+    return;
 }
 
 function closeModal() {
