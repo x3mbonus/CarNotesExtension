@@ -176,7 +176,7 @@ function showNoteModal(carId, existingNote, article) {
             updateNoteTextarea();
         }
     ));
-    
+
     const textarea = window.UIComponents.createNoteTextarea(
         state.text,
         state.color,
