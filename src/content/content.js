@@ -6,6 +6,13 @@ const queriedCarIds = new Set(); // Track which car IDs we've already fetched fr
 const notesCache = {}; // Cache fetched notes to avoid re-querying on reinit
 let initializeTimer = null; // Debounce timer
 
+// Initialize Supabase client immediately
+(async () => {
+    if (window.SupabaseClient) {
+        await window.SupabaseClient.init();
+    }
+})();
+
 // Initialize
 document.addEventListener('DOMContentLoaded', initializeContentScript);
 window.addEventListener('load', initializeContentScript);
@@ -126,43 +133,27 @@ function showNoteModal(carId, existingNote, article) {
     const modal = document.createElement('div');
     modal.className = 'car-note-modal';
 
-    const colors = ['#607D8B', '#4caf50', '#00bcd4', '#ff9800', '#f44336', '#9c27b0', '#ffeb3b', '#8b4513'];
-    const currentColor = existingNote ? existingNote.color : '#607D8B';
-    const currentText = existingNote ? existingNote.text : '';
+    // Initialize state from existing note or defaults
+    const state = {
+        color: existingNote?.color || '#607D8B',
+        text: existingNote?.text || '',
+        sort: existingNote?.sort ?? -1,
+        confirmed: existingNote?.confirmed || false,
+        features: existingNote?.features || {}
+    };
 
+    // Build modal HTML with header and content area (will fill with components)
     modal.innerHTML = `
         <div class="car-note-modal-header">
-            <h3>Car Note - ID: ${escapeHtml(carId)}</h3>
+            <h3>Car Details - ID: ${escapeHtml(carId)}</h3>
             <button class="car-note-modal-close" title="Close">✕</button>
         </div>
-
-        <div class="car-note-modal-content">
-            <textarea
-                class="car-note-modal-textarea"
-                placeholder="Add your note here..."
-                rows="6"
-            >${escapeHtml(currentText)}</textarea>
-
-            <div class="car-note-modal-colors">
-                <label>Color:</label>
-                <div class="car-note-color-grid">
-                    ${colors.map(color => `
-                        <button
-                            class="car-note-color-btn ${color === currentColor ? 'selected' : ''}"
-                            data-color="${color}"
-                            style="background-color: ${color};"
-                            title="Select color"
-                        ></button>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-
+        <div class="car-note-modal-content"></div>
         <div class="car-note-modal-actions">
-            <button class="car-note-modal-delete-btn">🗑️ Delete Note</button>
+            <button class="car-note-modal-delete-btn">🗑️ Delete</button>
             <div>
                 <button class="car-note-modal-cancel-btn">Cancel</button>
-                <button class="car-note-modal-save-btn">Save Note</button>
+                <button class="car-note-modal-save-btn">Save</button>
             </div>
         </div>
     `;
@@ -171,56 +162,103 @@ function showNoteModal(carId, existingNote, article) {
     document.body.appendChild(modal);
     currentModal = { element: modal, backdrop: backdrop, carId: carId };
 
-    // Focus textarea
-    const textarea = modal.querySelector('.car-note-modal-textarea');
-    textarea.focus();
+    const contentArea = modal.querySelector('.car-note-modal-content');
 
-    // Color selection
-    modal.querySelectorAll('.car-note-color-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            modal.querySelectorAll('.car-note-color-btn').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-        });
-    });
+    // ===== NOTES SECTION =====
+    const noteSection = document.createElement('div');
+    noteSection.className = 'modal-section';
+    noteSection.appendChild(window.UIComponents.createSectionLabel('NOTES'));
+    noteSection.appendChild(window.UIComponents.createColorGrid(
+        window.UIComponents.getColors(),
+        state.color,
+        (color) => {
+            state.color = color;
+            updateNoteTextarea();
+        }
+    ));
+    
+    const textarea = window.UIComponents.createNoteTextarea(
+        state.text,
+        state.color,
+        (e) => {
+            state.text = e.target.value;
+        }
+    );
+    noteSection.appendChild(textarea);
+    contentArea.appendChild(noteSection);
 
-    // Close button
+    function updateNoteTextarea() {
+        textarea.style.backgroundColor = state.color;
+        textarea.style.color = window.getTextColorForBackground(state.color);
+    }
+
+    // ===== RATING SECTION =====
+    const ratingSection = document.createElement('div');
+    ratingSection.className = 'modal-section';
+    ratingSection.appendChild(window.UIComponents.createSectionLabel('RATING'));
+    ratingSection.appendChild(window.UIComponents.createRatingSelect(
+        state.sort,
+        (sortId) => {
+            state.sort = sortId;
+        }
+    ));
+    contentArea.appendChild(ratingSection);
+
+    // ===== VERIFICATION SECTION =====
+    const verifySection = document.createElement('div');
+    verifySection.className = 'modal-section';
+    verifySection.appendChild(window.UIComponents.createSectionLabel('VERIFICATION STATUS'));
+    verifySection.appendChild(window.UIComponents.createVerificationButton(
+        state.confirmed,
+        () => {
+            state.confirmed = !state.confirmed;
+        }
+    ));
+    contentArea.appendChild(verifySection);
+
+    // ===== FEATURES SECTION =====
+    const featuresSection = document.createElement('div');
+    featuresSection.className = 'modal-section';
+    featuresSection.appendChild(window.UIComponents.createSectionLabel('FEATURES'));
+    featuresSection.appendChild(window.UIComponents.createFeaturesGrid(
+        window.UIComponents.getFeaturesList(),
+        state.features,
+        (featureKey) => {
+            state.features[featureKey] = !state.features[featureKey];
+        }
+    ));
+    contentArea.appendChild(featuresSection);
+
+    // ===== EVENT HANDLERS =====
     modal.querySelector('.car-note-modal-close').addEventListener('click', closeModal);
-
-    // Cancel button
     modal.querySelector('.car-note-modal-cancel-btn').addEventListener('click', closeModal);
 
-    // Save button
     modal.querySelector('.car-note-modal-save-btn').addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        const text = textarea.value.trim();
-        const color = modal.querySelector('.car-note-color-btn.selected')?.getAttribute('data-color') || '#607D8B';
-
-        if (!text) {
+        if (!state.text.trim()) {
             alert('Please enter a note');
             return;
         }
 
-        const result = await saveNote(carId, {
-            text: text,
-            color: color,
-            createdAt: existingNote?.createdAt || new Date().toISOString()
+        const noteResult = await saveNote(carId, {
+            text: state.text,
+            color: state.color,
+            createdAt: existingNote?.createdAt || new Date().toISOString(),
+            sort: state.sort,
+            confirmed: state.confirmed,
+            features: state.features
         });
 
-        if (result.success) {
+        if (noteResult.success) {
             closeModal();
-
-            // Remove old note displays so they get recreated with fresh data
-            document.querySelector(`[data-car-id="${carId}"].car-note-display`)?.remove();
-            document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`)?.remove();
-
-            // Reinitialize to show the newly saved note with updated content
             initializeContentScript();
+        } else {
+            alert('Failed to save note: ' + (noteResult.error || 'Unknown error'));
         }
     });
 
-    // Delete button
     const deleteBtn = modal.querySelector('.car-note-modal-delete-btn');
     if (deleteBtn) {
         deleteBtn.addEventListener('click', async (e) => {
@@ -228,14 +266,11 @@ function showNoteModal(carId, existingNote, article) {
             e.stopPropagation();
 
             if (confirm('Delete this note?')) {
-                if (typeof SupabaseSync !== 'undefined') {
-                    await SupabaseSync.deleteNoteFromSupabase(carId);
+                if (typeof window.SupabaseApi !== 'undefined') {
+                    await window.SupabaseApi.deleteCarData(carId);
                 }
 
-                // Update cache - remove the note
                 delete notesCache[carId];
-
-                // Remove displays
                 document.querySelector(`[data-car-id="${carId}"].car-note-display`)?.remove();
                 document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`)?.remove();
 

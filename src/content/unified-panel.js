@@ -1,6 +1,6 @@
-// Unified Detail Page Panel - Combines notes + features + export in one panel
+// Car Detail Panel - Combines notes + features + export in one panel
 
-window.UnifiedPanel = {
+window.CarDetailPanel = {
     currentCarId: null,
     currentFeatures: null,
     isVerified: false,
@@ -16,7 +16,7 @@ window.UnifiedPanel = {
      * Show unified panel with all car data
      */
     async showPanel(carId, data) {
-        console.log('🔍 UnifiedPanel.showPanel called with carId:', carId);
+        console.log('🔍 CarDetailPanel.showPanel called with carId:', carId);
 
         // Prevent duplicate initialization of same car
         if (this.currentCarId === carId && this.panelElement) {
@@ -40,14 +40,26 @@ window.UnifiedPanel = {
         }
 
         // Load or initialize features
-        console.log('[UnifiedPanel] FeaturesManager exists?', !!window.FeaturesManager);
+        console.log('[CarDetailPanel] FeaturesManager exists?', !!window.FeaturesManager);
         try {
-            console.log('[UnifiedPanel] Calling initializeFeatures...');
+            console.log('[CarDetailPanel] Calling initializeFeatures...');
             const featureState = await window.FeaturesManager?.initializeFeatures?.(carId, data);
-            console.log('[UnifiedPanel] initializeFeatures returned:', featureState);
+            console.log('[CarDetailPanel] initializeFeatures returned:', featureState);
             this.currentFeatures = featureState?.features || {};
             this.isVerified = featureState?.confirmed || false;
-            this.currentSort = featureState?.sort ?? -1;
+            this.currentSort = featureState?.sort ?? null;  // null = no rating, not -1
+
+            // If features were parsed (not from DB), save them automatically
+            if (!featureState?.isFromDb && featureState?.featuresSource === 'parsed') {
+                console.log('[CarDetailPanel] Auto-saving parsed features on first open...');
+                await window.FeaturesManager?.confirmAllFeatures?.(carId, this.currentFeatures, this.currentSort, false);
+                console.log('[CarDetailPanel] Parsed features auto-saved');
+            }
+
+            // If verified and sort is set, update note color to match sort level
+            if (this.currentSort !== null && this.currentSort !== -1 && this.isVerified) {
+                this.updateNoteColorBySort(this.currentSort);
+            }
             console.log('✅ Features loaded:', Object.keys(this.currentFeatures).length, 'features');
         } catch (error) {
             console.error('❌ Error loading features:', error);
@@ -55,14 +67,14 @@ window.UnifiedPanel = {
         }
 
         // Load note
-        console.log('[UnifiedPanel] Calling getNote...');
+        console.log('[CarDetailPanel] Calling getNote...');
         try {
             const notePromise = window.getNote?.(carId);
             const timeoutPromise = new Promise((resolve) =>
                 setTimeout(() => resolve(null), 2000) // 2 second timeout
             );
             const noteData = notePromise ? await Promise.race([notePromise, timeoutPromise]) : null;
-            console.log('[UnifiedPanel] getNote returned:', noteData);
+            console.log('[CarDetailPanel] getNote returned:', noteData);
             if (noteData) {
                 this.currentNote = noteData.text || '';
                 this.currentColor = noteData.color || '#FFEB3B';
@@ -73,9 +85,13 @@ window.UnifiedPanel = {
         }
 
         console.log('📝 Updating panel content...');
-        this.updatePanelContent();
+        this.updateNoteSection();
+        this.updateSortSection();
+        this.updateVerifiedSection();
+        this.updateFeaturesSection();
+        this.updateExportSection();
+
         this.isInitializing = false;
-        console.log('✅ Panel initialization complete for carId:', carId);
     },
 
     /**
@@ -136,6 +152,29 @@ window.UnifiedPanel = {
         title.textContent = '📋 Car Details';
         header.appendChild(title);
 
+        // Refresh button
+        const refreshBtn = document.createElement('button');
+        refreshBtn.id = 'unified-panel-refresh';
+        refreshBtn.textContent = '🔄';
+        refreshBtn.title = 'Refresh data';
+        refreshBtn.style.cssText = `
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        `;
+        refreshBtn.onmouseover = () => refreshBtn.style.background = 'rgba(255,255,255,0.3)';
+        refreshBtn.onmouseout = () => refreshBtn.style.background = 'rgba(255,255,255,0.2)';
+        refreshBtn.onclick = async () => {
+            console.log('[CarDetailPanel] Refreshing...');
+            await this.showPanel(this.currentCarId);
+        };
+        header.appendChild(refreshBtn);
+
         // Collapse button
         const collapseBtn = document.createElement('button');
         collapseBtn.id = 'unified-panel-collapse';
@@ -164,30 +203,30 @@ window.UnifiedPanel = {
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 16px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
             min-height: 0;
         `;
 
-        // Section 1: Verified Status
-        const verifiedSection = document.createElement('div');
-        verifiedSection.id = 'unified-verified-section';
-        verifiedSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
-        content.appendChild(verifiedSection);
+        // Section 1: Note (moved before features)
+        const noteSection = document.createElement('div');
+        noteSection.id = 'unified-note-section';
+        noteSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
+        content.appendChild(noteSection);
 
-        // Section 2: Sort Level
+        // Section 2: Sort/Rating
         const sortSection = document.createElement('div');
         sortSection.id = 'unified-sort-section';
         sortSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
         content.appendChild(sortSection);
 
-        // Section 3: Note
-        const noteSection = document.createElement('div');
-        noteSection.id = 'unified-note-section';
-        noteSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
-        content.appendChild(noteSection);
+        // Section 3: Verified Status
+        const verifiedSection = document.createElement('div');
+        verifiedSection.id = 'unified-verified-section';
+        verifiedSection.innerHTML = '<div style="color: #ccc; font-size: 12px;">Loading...</div>';
+        content.appendChild(verifiedSection);
 
         // Section 4: Features
         const featuresSection = document.createElement('div');
@@ -251,29 +290,9 @@ window.UnifiedPanel = {
         }
 
         section.innerHTML = '';
+        section.appendChild(window.UIComponents.createSectionLabel('VERIFICATION STATUS'));
 
-        const label = document.createElement('div');
-        label.style.cssText = 'font-size: 12px; font-weight: 600; color: #666; margin-bottom: 8px;';
-        label.textContent = 'VERIFICATION STATUS';
-        section.appendChild(label);
-
-        const button = document.createElement('button');
-        button.style.cssText = `
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.2s;
-            background: ${this.isVerified ? '#E8F5E9' : '#FFF3E0'};
-            color: ${this.isVerified ? '#1B5E20' : '#E65100'};
-            border-color: ${this.isVerified ? '#4CAF50' : '#FF9800'};
-        `;
-        button.textContent = this.isVerified ? '✓ Verified' : '⊙ Not Verified';
-
-        button.onclick = async () => {
+        const btn = window.UIComponents.createVerificationButton(this.isVerified, async () => {
             this.isVerified = !this.isVerified;
             console.log('🔄 Toggling verified status to:', this.isVerified);
             await window.FeaturesManager?.confirmAllFeatures?.(
@@ -283,9 +302,9 @@ window.UnifiedPanel = {
                 this.isVerified
             );
             this.updateVerifiedSection();
-        };
+        });
 
-        section.appendChild(button);
+        section.appendChild(btn);
         console.log('✅ Verified section updated');
     },
 
@@ -300,81 +319,62 @@ window.UnifiedPanel = {
         }
 
         section.innerHTML = '';
+        section.appendChild(window.UIComponents.createSectionLabel('RATING'));
 
-        const label = document.createElement('div');
-        label.style.cssText = 'font-size: 12px; font-weight: 600; color: #666; margin-bottom: 8px;';
-        label.textContent = 'SORT CATEGORY';
-        section.appendChild(label);
+        const sortColors = {
+            0: '#2E7D32',    // Best - bright green
+            1: '#CDDC39',    // Good - yellow-green
+            2: '#FDD835',    // Fair - yellow
+            3: '#FF7043',    // Poor - orange-red
+            '-1': '#F44336'  // Excluded - red
+        };
 
-        const container = document.createElement('div');
-        container.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px;';
+        const select = window.UIComponents.createRatingSelect(this.currentSort, async (sortId) => {
+            console.log(`[CarDetailPanel] Rating changed to: ${sortId}`);
+            this.currentSort = sortId !== null ? sortId : null;  // Keep null as null, not -1
 
-        const sorts = [
-            { id: 0, label: 'Best ★★★★', color: '#4CAF50', bg: '#C8E6C9' },
-            { id: 1, label: 'Good ★★★', color: '#2196F3', bg: '#BBDEFB' },
-            { id: 2, label: 'Fair ★★', color: '#FF9800', bg: '#FFE0B2' },
-            { id: 3, label: 'Poor ★', color: '#F44336', bg: '#FFCDD2' },
-            { id: -1, label: 'Excluded ✕', color: '#999', bg: '#F5F5F5', span: true }
-        ];
+            // Update note color to match rating
+            if (sortId !== null && sortColors[sortId]) {
+                this.currentColor = sortColors[sortId];
+                await window.saveNote(this.currentCarId, {
+                    text: this.currentNote,
+                    color: this.currentColor
+                });
+            }
 
-        sorts.forEach(sort => {
-            const button = document.createElement('button');
-            const isSelected = this.currentSort === sort.id;
+            console.log(`[CarDetailPanel] Saving rating: carId=${this.currentCarId}, sort=${this.currentSort}`);
+            const result = await window.FeaturesManager.confirmAllFeatures(
+                this.currentCarId,
+                this.currentFeatures,
+                this.currentSort,
+                this.isVerified
+            );
+            console.log(`[CarDetailPanel] Rating saved:`, result);
 
-            button.textContent = sort.label;
-            button.style.cssText = `
-                padding: 10px;
-                border: 2px solid ${sort.color};
-                border-radius: 6px;
-                background: ${isSelected ? sort.bg : 'white'};
-                color: ${sort.color};
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 12px;
-                transition: all 0.2s;
-                ${sort.span ? 'grid-column: 1 / -1;' : ''}
-            `;
-
-            button.onmouseover = () => {
-                if (!isSelected) button.style.background = sort.bg;
-            };
-            button.onmouseout = () => {
-                if (!isSelected) button.style.background = 'white';
-            };
-
-            button.onclick = async () => {
-                console.log(`[UnifiedPanel] Sort button clicked: ${sort.label} (id=${sort.id})`);
-                this.currentSort = sort.id;
-                console.log(`[UnifiedPanel] currentFeatures before confirmAllFeatures: ${Object.keys(this.currentFeatures).length} features`);
-                console.log(`[UnifiedPanel] Calling confirmAllFeatures with carId=${this.currentCarId}, sort=${this.currentSort}, verified=${this.isVerified}`);
-                const result = await window.FeaturesManager.confirmAllFeatures(
-                    this.currentCarId,
-                    this.currentFeatures,
-                    this.currentSort,
-                    this.isVerified
-                );
-                console.log(`[UnifiedPanel] confirmAllFeatures result:`, result);
-                console.log(`[UnifiedPanel] currentFeatures after confirmAllFeatures:`, Object.keys(this.currentFeatures).length, 'features');
-
-                // Force refresh features from DB after sort change
-                console.log(`[UnifiedPanel] Refreshing features from database after sort change...`);
-                const refreshedFeatures = await window.FeaturesManager.initializeFeatures(this.currentCarId);
-                if (refreshedFeatures && refreshedFeatures.features) {
-                    this.currentFeatures = refreshedFeatures.features;
-                    this.isVerified = refreshedFeatures.confirmed || false;
-                    this.currentSort = refreshedFeatures.sort ?? -1;
-                    console.log(`[UnifiedPanel] Features refreshed after sort, now has`, Object.keys(this.currentFeatures).length, 'features');
-                }
-
-                this.updateSortSection();
-                this.updateFeaturesSection();  // Also refresh features after sort change
-            };
-
-            container.appendChild(button);
+            this.updateSortSection();
+            this.updateFeaturesSection();
+            this.updateNoteSection();
         });
 
-        section.appendChild(container);
-        console.log('✅ Sort section updated');
+        section.appendChild(select);
+        console.log('✅ Rating dropdown updated');
+    },
+
+    /**
+     * Update note color based on sort level
+     */
+    updateNoteColorBySort(sortId) {
+        const sortColors = {
+            0: '#2E7D32',  // Best - bright green
+            1: '#CDDC39',  // Good - yellow-green
+            2: '#FDD835',  // Fair - yellow
+            3: '#FF7043',  // Poor - orange-red
+            '-1': '#F44336'   // Excluded - red
+        };
+
+        if (sortColors[sortId]) {
+            this.currentColor = sortColors[sortId];
+        }
     },
 
     /**
@@ -388,68 +388,51 @@ window.UnifiedPanel = {
         }
 
         section.innerHTML = '';
+        section.appendChild(window.UIComponents.createSectionLabel('NOTES'));
 
-        const label = document.createElement('div');
-        label.style.cssText = 'font-size: 12px; font-weight: 600; color: #666; margin-bottom: 8px;';
-        label.textContent = 'NOTES';
-        section.appendChild(label);
-
-        // Color picker
-        const colorContainer = document.createElement('div');
-        colorContainer.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px;';
-
-        const colors = ['#FFEB3B', '#FF9800', '#F44336', '#4CAF50', '#2196F3', '#9C27B0', '#E91E63'];
-        colors.forEach(color => {
-            const colorBtn = document.createElement('button');
-            colorBtn.style.cssText = `
-                width: 24px;
-                height: 24px;
-                border: ${this.currentColor === color ? '2px solid #333' : '2px solid #ddd'};
-                background: ${color};
-                border-radius: 4px;
-                cursor: pointer;
-                transition: all 0.2s;
-            `;
-            colorBtn.onclick = () => {
+        // Color grid with immediate save on color change
+        const colorGrid = window.UIComponents.createColorGrid(
+            window.UIComponents.getColors(),
+            this.currentColor,
+            async (color) => {
                 this.currentColor = color;
+                console.log('[CarDetailPanel] Color changed to:', color);
+                // Save color immediately with current note
+                await window.saveNote(this.currentCarId, {
+                    text: this.currentNote,
+                    color: this.currentColor
+                });
                 this.updateNoteSection();
-            };
-            colorContainer.appendChild(colorBtn);
-        });
+            }
+        );
+        section.appendChild(colorGrid);
 
-        section.appendChild(colorContainer);
+        // Textarea with debounced save
+        const textarea = window.UIComponents.createNoteTextarea(
+            this.currentNote,
+            this.currentColor,
+            () => {}
+        );
 
-        // Text area
-        const textarea = document.createElement('textarea');
-        textarea.value = this.currentNote;
-        textarea.placeholder = 'Add a note...';
-        textarea.style.cssText = `
-            width: 100%;
-            height: 80px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 13px;
-            resize: vertical;
-            background: ${this.currentColor};
-            color: #333;
-        `;
-
-        let saveTimeout;
         textarea.oninput = () => {
-            console.log('[UnifiedPanel] Note input changed');
+            console.log('[CarDetailPanel] Note input changed');
             this.currentNote = textarea.value;
+
+            // Update textarea text color in real-time
+            const textColor = window.getTextColorForBackground(this.currentColor);
+            textarea.style.color = textColor;
+
+            // Debounced save
             clearTimeout(this.noteSaveTimeout);
             this.noteSaveTimeout = setTimeout(() => {
-                console.log('[UnifiedPanel] Saving note after 500ms debounce...');
+                console.log('[CarDetailPanel] Saving note after 500ms debounce...');
                 window.saveNote?.(this.currentCarId, {
                     text: this.currentNote,
                     color: this.currentColor
                 }).then(() => {
-                    console.log('[UnifiedPanel] Note saved successfully');
+                    console.log('[CarDetailPanel] Note saved successfully');
                 }).catch((error) => {
-                    console.error('[UnifiedPanel] Error saving note:', error);
+                    console.error('[CarDetailPanel] Error saving note:', error);
                 });
             }, 500);
         };
@@ -471,11 +454,7 @@ window.UnifiedPanel = {
         console.log('[updateFeaturesSection] Starting, currentFeatures has', Object.keys(this.currentFeatures || {}).length, 'features');
 
         section.innerHTML = '';
-
-        const label = document.createElement('div');
-        label.style.cssText = 'font-size: 12px; font-weight: 600; color: #666; margin-bottom: 8px;';
-        label.textContent = 'FEATURES';
-        section.appendChild(label);
+        section.appendChild(window.UIComponents.createSectionLabel('FEATURES'));
 
         // Defensive: ensure currentFeatures is initialized
         if (!this.currentFeatures || Object.keys(this.currentFeatures).length === 0) {
@@ -487,95 +466,33 @@ window.UnifiedPanel = {
             return;
         }
 
-        const groupedFeatures = window.FeaturesDisplay?.getGroupedFeatures(this.currentFeatures) || {};
-        console.log('[updateFeaturesSection] Grouped features:', Object.keys(groupedFeatures));
+        // Create scrollable features grid using UIComponents
+        const gridContainer = document.createElement('div');
+        gridContainer.style.cssText = 'max-height: 500px; overflow-y: auto;';
 
-        const stats = window.FeaturesParser?.getStatistics?.(this.currentFeatures) || {};
-        console.log('[updateFeaturesSection] Stats:', stats);
+        const grid = window.UIComponents.createFeaturesGrid(
+            window.UIComponents.getFeaturesList(),
+            this.currentFeatures,
+            async (featureKey) => {
+                this.currentFeatures[featureKey] = !this.currentFeatures[featureKey];
+                const featureLabel = window.UIComponents.getFeaturesList().find(f => f.key === featureKey)?.label || featureKey;
+                console.log(`[CarDetailPanel] Feature ${featureLabel} toggled to:`, this.currentFeatures[featureKey]);
 
-        // Stats bar
-        const statsBar = document.createElement('div');
-        statsBar.style.cssText = `
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        `;
+                // Save to DB
+                await window.FeaturesManager?.saveFeatures?.(
+                    this.currentCarId,
+                    this.currentFeatures,
+                    this.currentSort,
+                    this.isVerified
+                );
 
-        const statItems = [
-            { label: '✓', count: stats.present || 0, color: '#4CAF50' },
-            { label: '?', count: stats.unknown || 0, color: '#FFC107' },
-            { label: '✗', count: stats.missing || 0, color: '#F44336' }
-        ];
+                this.updateFeaturesSection();
+            }
+        );
 
-        statItems.forEach(item => {
-            const stat = document.createElement('div');
-            stat.style.cssText = `
-                background: ${item.color}22;
-                color: ${item.color};
-                padding: 4px 8px;
-                border-radius: 4px;
-                flex: 1;
-                text-align: center;
-            `;
-            stat.textContent = `${item.label} ${item.count}`;
-            statsBar.appendChild(stat);
-        });
-
-        section.appendChild(statsBar);
-
-        // Features grid
-        const grid = document.createElement('div');
-        grid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 250px; overflow-y: auto; border: 1px solid #eee; padding: 8px; border-radius: 4px;';
-
-        Object.entries(groupedFeatures).forEach(([category, features]) => {
-            Object.entries(features).forEach(([featureName, state]) => {
-                const btn = document.createElement('button');
-                btn.style.cssText = `
-                    padding: 6px;
-                    font-size: 11px;
-                    border-radius: 4px;
-                    border: 1px solid #ddd;
-                    cursor: pointer;
-                    background: ${window.FeaturesDisplay?.getFeatureBackground(featureName, state)};
-                    color: ${window.FeaturesDisplay?.getFeatureTextColor(featureName, state)};
-                    transition: all 0.2s;
-                `;
-
-                btn.textContent = `${window.FeaturesDisplay?.getFeatureIcon(state)} ${featureName}`;
-                btn.title = 'Click to cycle: ✓ → ? → ✗ → ✓';
-
-                btn.onclick = async () => {
-                    console.log(`[UnifiedPanel] Feature button clicked: ${featureName}, current state: ${state}`);
-                    const nextState = window.FeaturesDisplay?.getNextState(state);
-                    console.log(`[UnifiedPanel] Next state: ${nextState}`);
-                    this.currentFeatures[featureName] = nextState;
-                    console.log(`[UnifiedPanel] Updated currentFeatures[${featureName}] to ${nextState}, feature count now:`, Object.keys(this.currentFeatures).length);
-                    console.log(`[UnifiedPanel] Calling toggleFeature with carId=${this.currentCarId}, feature=${featureName}, currentState=${state}`);
-                    const result = await window.FeaturesManager.toggleFeature(this.currentCarId, featureName, state);
-                    console.log(`[UnifiedPanel] toggleFeature result:`, result);
-                    console.log(`[UnifiedPanel] currentFeatures after save has`, Object.keys(this.currentFeatures).length, 'features');
-
-                    // Force refresh features from DB to ensure sync
-                    console.log(`[UnifiedPanel] Refreshing features from database...`);
-                    const refreshedFeatures = await window.FeaturesManager.initializeFeatures(this.currentCarId);
-                    if (refreshedFeatures && refreshedFeatures.features) {
-                        this.currentFeatures = refreshedFeatures.features;
-                        this.isVerified = refreshedFeatures.confirmed || false;
-                        this.currentSort = refreshedFeatures.sort ?? -1;
-                        console.log(`[UnifiedPanel] Features refreshed, now has`, Object.keys(this.currentFeatures).length, 'features');
-                    }
-
-                    this.updateFeaturesSection();
-                };
-
-                grid.appendChild(btn);
-            });
-        });
-
-        section.appendChild(grid);
-        console.log('[UnifiedPanel] Features section updated successfully, features count:', Object.keys(this.currentFeatures).length);
+        gridContainer.appendChild(grid);
+        section.appendChild(gridContainer);
+        console.log('[CarDetailPanel] Features section updated successfully');
     },
 
     /**
@@ -592,12 +509,12 @@ window.UnifiedPanel = {
         section.innerHTML = '';
 
         const label = document.createElement('div');
-        label.style.cssText = 'font-size: 12px; font-weight: 600; color: #666; margin-bottom: 8px;';
+        label.style.cssText = 'font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px;';
         label.textContent = 'EXPORT';
         section.appendChild(label);
 
         const container = document.createElement('div');
-        container.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px;';
+        container.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 6px;';
 
         const exports = [
             { name: 'JSON', action: 'json', icon: '{}' },
@@ -610,14 +527,14 @@ window.UnifiedPanel = {
             const btn = document.createElement('button');
             btn.textContent = `${exp.icon} ${exp.name}`;
             btn.style.cssText = `
-                padding: 10px;
+                padding: 8px;
                 background: #667eea;
                 color: white;
                 border: none;
                 border-radius: 6px;
                 cursor: pointer;
                 font-weight: 600;
-                font-size: 12px;
+                font-size: 11px;
                 transition: all 0.2s;
             `;
 

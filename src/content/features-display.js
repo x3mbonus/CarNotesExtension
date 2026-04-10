@@ -372,8 +372,12 @@ window.FeaturesDisplay = {
                 const data = window.extractCarData?.();
                 const newFeatures = {};
                 const parsed = window.FeaturesParser.parseFeatures(data);
-                Object.entries(parsed).forEach(([name, isPresent]) => {
-                    newFeatures[name] = isPresent ? true : null;
+                Object.entries(parsed).forEach(([featureName, isPresent]) => {
+                    // Convert feature names to database column names for consistency
+                    const columnName = window.FeatureColumnMapper ?
+                        window.FeatureColumnMapper.featureToColumnName(featureName) :
+                        'feature_' + featureName.toLowerCase().replace(/\s+/g, '_');
+                    newFeatures[columnName] = isPresent ? true : null;
                 });
                 this.currentFeatures = newFeatures;
                 this.isConfirmed = false;
@@ -436,8 +440,12 @@ window.FeaturesDisplay = {
         const grouped = {};
         Object.entries(window.FeaturesParser.FEATURE_CATEGORIES).forEach(([category, categoryFeatures]) => {
             grouped[category] = {};
-            categoryFeatures.forEach(feature => {
-                grouped[category][feature] = features[feature] !== undefined ? features[feature] : null;
+            categoryFeatures.forEach(featureName => {
+                // Convert feature display name to column name
+                const columnName = window.FeatureColumnMapper ?
+                    window.FeatureColumnMapper.featureToColumnName(featureName) :
+                    'feature_' + featureName.toLowerCase().replace(/\s+/g, '_');
+                grouped[category][featureName] = features[columnName] !== undefined ? features[columnName] : null;
             });
         });
         return grouped;

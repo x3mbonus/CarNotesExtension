@@ -26,8 +26,8 @@ window.ListingHandler = {
 
         // Fetch notes from DB in one query
         let dbNotes = {};
-        if (carIds.length > 0 && typeof SupabaseSync !== 'undefined') {
-            dbNotes = await SupabaseSync.getNotesByIds(carIds) || {};
+        if (carIds.length > 0 && typeof window.SupabaseApi !== 'undefined') {
+            dbNotes = await window.SupabaseApi.getDataByIds(carIds) || {};
             Object.assign(notesCache, dbNotes);
         }
 

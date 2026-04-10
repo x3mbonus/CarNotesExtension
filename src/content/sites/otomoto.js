@@ -98,8 +98,8 @@ window.OtomotoAdapter = {
 
         // Fetch notes from DB
         let dbNotes = {};
-        if (carIds.length > 0 && typeof SupabaseSync !== 'undefined') {
-            dbNotes = await SupabaseSync.getNotesByIds(carIds) || {};
+        if (carIds.length > 0 && typeof window.SupabaseApi !== 'undefined') {
+            dbNotes = await window.SupabaseApi.getDataByIds(carIds) || {};
             Object.assign(notesCache, dbNotes);
         }
 
@@ -141,8 +141,8 @@ window.OtomotoAdapter = {
      */
     async handleDetailPage(pathname, search) {
         const carId = this.extractDetailId(pathname);
-        if (carId && window.UnifiedPanel) {
-            window.UnifiedPanel.showPanel(carId);
+        if (carId && window.CarDetailPanel) {
+            window.CarDetailPanel.showPanel(carId);
         }
     }
 };

@@ -1,18 +1,22 @@
 // Utility functions for Car Notes extension
 
 function getTextColorForBackground(bgColor) {
-    // Simple algorithm to determine if text should be light or dark
+    // WCAG 2.0 algorithm for better contrast detection
     // Extract RGB values
     const hex = bgColor.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
+    const r = parseInt(hex.substr(0, 2), 16) / 255;
+    const g = parseInt(hex.substr(2, 2), 16) / 255;
+    const b = parseInt(hex.substr(4, 2), 16) / 255;
 
-    // Calculate brightness (WCAG formula)
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    // Calculate relative luminance
+    const lum = (
+        0.299 * (r > 0.03928 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92) +
+        0.587 * (g > 0.03928 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92) +
+        0.114 * (b > 0.03928 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92)
+    );
 
-    // Return light text for dark backgrounds, dark text for light backgrounds
-    return brightness > 128 ? '#000000' : '#ffffff';
+    // Return dark text for bright backgrounds, light text for dark backgrounds
+    return lum > 0.5 ? '#1a1a1a' : '#ffffff';
 }
 
 function escapeHtml(text) {
@@ -23,28 +27,48 @@ function escapeHtml(text) {
 
 async function getNote(carId) {
     // Fetch note from database
-    if (typeof SupabaseSync !== 'undefined') {
-        return await SupabaseSync.getNoteById(carId);
+    const data = await window.SupabaseApi.getCarData(carId);
+    if (data) {
+        return {
+            text: data.text,
+            color: data.color,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+            sort: data.sort,
+            confirmed: data.confirmed || false,
+            features: data.features || {}
+        };
     }
     return null;
 }
 
 async function saveNote(carId, noteData) {
-    // Save note to database
-    if (typeof SupabaseSync !== 'undefined') {
-        const result = await SupabaseSync.syncNoteToSupabase(carId, noteData);
-
-        // Update local cache with the saved note
-        if (result.success) {
-            notesCache[carId] = {
-                text: noteData.text,
-                color: noteData.color,
-                createdAt: noteData.createdAt,
-                updatedAt: new Date().toISOString()
-            };
+    // Save note to database with features and metadata
+    const result = await window.SupabaseApi.saveCarData(carId,
+        {
+            text: noteData.text,
+            color: noteData.color || '#FFEB3B'
+        },
+        {
+            features: noteData.features || {},
+            sort: noteData.sort !== undefined ? noteData.sort : null,
+            confirmed: noteData.confirmed || false,
+            featuresSource: 'manual'
         }
+    );
 
-        return result;
+    // Update local cache with the saved note
+    if (result.success) {
+        notesCache[carId] = {
+            text: noteData.text,
+            color: noteData.color,
+            createdAt: noteData.createdAt,
+            updatedAt: new Date().toISOString(),
+            sort: noteData.sort !== undefined ? noteData.sort : null,
+            confirmed: noteData.confirmed || false,
+            features: noteData.features || {}
+        };
     }
-    return { success: false };
+
+    return result;
 }

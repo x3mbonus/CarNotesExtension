@@ -12,8 +12,8 @@ window.FeatureColumnMapper = {
     featureToColumnName(featureName) {
         return 'feature_' + featureName
             .toLowerCase()
+            .replace(/\s*\/\s*/g, '_')      // slashes with surrounding spaces to single underscore
             .replace(/\s+/g, '_')           // spaces to underscores
-            .replace(/\//g, '_')             // slashes to underscores
             .replace(/[^\w_]/g, '');         // remove special chars
     },
 
@@ -37,14 +37,25 @@ window.FeatureColumnMapper = {
 
     /**
      * Convert features object to database row update payload
-     * Input:  { 'ACC': true, 'Blind spot': null, 'Lane assist': false, ... }
-     * Output: { feature_acc: true, feature_blind_spot: null, feature_lane_assist: false, ... }
+     * Input can use either feature display names or column names
+     * Input:  { 'ACC': true, 'feature_blind_spot': null, ... }
+     * Output: { feature_acc: true, feature_blind_spot: null, ... }
      */
     featuresToDatabaseRow(featuresObject) {
         const payload = {};
+        const mappings = this.getAllMappings();
 
-        Object.entries(featuresObject).forEach(([featureName, state]) => {
-            const columnName = this.featureToColumnName(featureName);
+        Object.entries(featuresObject).forEach(([key, state]) => {
+            let columnName;
+
+            // Check if key is already a column name (starts with 'feature_')
+            if (key.startsWith('feature_')) {
+                columnName = key;
+            } else {
+                // Convert feature name to column name
+                columnName = this.featureToColumnName(key);
+            }
+
             // Only include boolean values (true, false, null for unknown)
             payload[columnName] = state === true ? true : (state === null ? null : false);
         });
@@ -55,26 +66,17 @@ window.FeatureColumnMapper = {
     /**
      * Convert database row to features object
      * Input:  { feature_acc: true, feature_blind_spot: null, feature_lane_assist: false, ... }
-     * Output: { 'ACC': true, 'Blind spot': null, 'Lane assist': false, ... }
+     * Output: { feature_acc: true, feature_blind_spot: null, feature_lane_assist: false, ... }
+     * NOTE: Keys are database column names to match UIComponents.getFeaturesList() keys
      */
     databaseRowToFeatures(rowObject) {
-        const mappings = this.getAllMappings();
-        const reverseMap = {};
-
-        // Create reverse mapping: column_name -> feature_name
-        Object.entries(mappings).forEach(([featureName, columnName]) => {
-            reverseMap[columnName] = featureName;
-        });
-
         const features = {};
 
         Object.entries(rowObject).forEach(([columnName, state]) => {
             if (columnName.startsWith('feature_')) {
-                const featureName = reverseMap[columnName];
-                if (featureName) {
-                    // Normalize: true/false -> true/false, null -> null, anything else -> null
-                    features[featureName] = state === true ? true : (state === false ? false : null);
-                }
+                // Keep column name as key to match UIComponents.getFeaturesList()
+                // Normalize: true/false -> true/false, null -> null, anything else -> null
+                features[columnName] = state === true ? true : (state === false ? false : null);
             }
         });
 

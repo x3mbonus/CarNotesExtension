@@ -66,8 +66,8 @@ window.MobileDeAdapter = {
      */
     async handleDetailPage(pathname, search) {
         const carId = this.extractDetailId(search);
-        if (carId && window.UnifiedPanel) {
-            window.UnifiedPanel.showPanel(carId);
+        if (carId && window.CarDetailPanel) {
+            window.CarDetailPanel.showPanel(carId);
         }
     }
 };
