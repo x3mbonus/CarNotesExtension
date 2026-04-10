@@ -13,7 +13,7 @@ Service Worker network requests **don't appear in the regular Network tab** beca
 4. In the Service Worker console, go to **Network tab**
 5. Click a feature button on the detail page
 6. You should see:
-   - `PATCH https://xxxxx.supabase.co/rest/v1/car_data_local?car_id=eq.447...` 
+   - `PATCH https://xxxxx.supabase.co/rest/v1/car_data_local?car_id=eq.447...`
    - Status 200 (success)
 
 This tab shows ONLY service worker network requests.

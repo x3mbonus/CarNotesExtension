@@ -14,7 +14,7 @@ Click a feature and look for:
 ```
 
 ## Console 2: Background Worker (Service Worker)
-**Where**: 
+**Where**:
 1. Open `chrome://extensions/`
 2. Find "Car Notes"
 3. Click "Inspect views" → "service_worker"

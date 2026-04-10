@@ -3,7 +3,7 @@
 ## Quick Summary
 Everything is built for **auto-save** - no save button needed:
 - Click a **feature button** → auto-saves immediately
-- Click a **sort rating** → auto-saves immediately  
+- Click a **sort rating** → auto-saves immediately
 - **Type a note** → auto-saves after 500ms
 - Click **verified button** → auto-saves immediately
 
@@ -11,7 +11,7 @@ Everything is built for **auto-save** - no save button needed:
 Saving requires 3 things to be configured:
 
 ### 1. ❌ Supabase Project & Credentials
-**Status**: Not set up yet  
+**Status**: Not set up yet
 **You need**:
 - Supabase account (free tier at https://supabase.com)
 - Project URL (looks like: `https://xxxxxxxxxxxx.supabase.co`)
@@ -23,7 +23,7 @@ Saving requires 3 things to be configured:
 3. The extension will save them to `chrome.storage.sync`
 
 ### 2. ❌ Database Table
-**Status**: Not created yet  
+**Status**: Not created yet
 **You need to create**: `car_data_local` table with the SQL below
 
 Run this in Supabase SQL editor:
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS car_data_local (
   text TEXT,
   color TEXT DEFAULT '#FFEB3B',
   sort INT DEFAULT -1,
-  
+
   -- Feature columns (26 boolean columns)
   feature_acc BOOLEAN,
   feature_blind_spot BOOLEAN,
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS car_data_local (
   feature_auto_tailgate BOOLEAN,
   feature_tow_hitch BOOLEAN,
   feature_webasto BOOLEAN,
-  
+
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -76,8 +76,8 @@ CREATE INDEX idx_car_data_local_car_id ON car_data_local(car_id);
 ```
 
 ### 3. ✅ Background Worker
-**Status**: Already set up  
-**File**: `src/background/background.js`  
+**Status**: Already set up
+**File**: `src/background/background.js`
 **What it does**:
 - Listens for messages from content scripts
 - Handles `saveCarFeatures` and `getCarFeatures` requests
@@ -113,7 +113,7 @@ Calls SupabaseClient to write to car_data_local table
 ```
 
 ### Step 2: Set Credentials in Extension
-The extension needs to store credentials in `chrome.storage.sync`. 
+The extension needs to store credentials in `chrome.storage.sync`.
 
 **Option A - Manual (via background console)**:
 ```javascript
@@ -162,24 +162,24 @@ btn.onclick = async () => {
 ## Troubleshooting Saves
 
 ### Problem: "Getting TypeError: Cannot read property..."
-**Cause**: Supabase credentials not set  
+**Cause**: Supabase credentials not set
 **Fix**: Run `chrome.storage.sync.set()` command above
 
 ### Problem: "Background worker not responding"
-**Cause**: Service worker crashed or not loaded  
-**Fix**: 
+**Cause**: Service worker crashed or not loaded
+**Fix**:
 1. Reload extension (Chrome Extensions page → Reload)
 2. Check background console (Extensions page → Service Worker)
 
 ### Problem: "Cannot insert - RLS policy"
-**Cause**: Row Level Security blocking writes  
+**Cause**: Row Level Security blocking writes
 **Fix**: Run this in Supabase SQL:
 ```sql
 ALTER TABLE car_data_local DISABLE ROW LEVEL SECURITY;
 ```
 
 ### Problem: "relation 'car_data_local' does not exist"
-**Cause**: Table not created  
+**Cause**: Table not created
 **Fix**: Create table using SQL from Section 2 above
 
 ## Testing Checklist
@@ -190,7 +190,7 @@ ALTER TABLE car_data_local DISABLE ROW LEVEL SECURITY;
 - [ ] RLS is disabled on table
 - [ ] Click feature button → data appears in Supabase within 1 second
 - [ ] Type note → saves after 500ms
-- [ ] Click sort rating → data saves immediately  
+- [ ] Click sort rating → data saves immediately
 - [ ] Click verified button → data saves immediately
 - [ ] Refresh page → all data persists from DB
 

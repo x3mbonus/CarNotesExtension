@@ -23,7 +23,7 @@ const SupabaseClient = {
                     hasUrl: !!result.supabaseUrl,
                     hasKey: !!result.supabaseKey
                 });
-                
+
                 if (!result.supabaseUrl || !result.supabaseKey) {
                     console.warn('[SupabaseClient.init] Credentials not found in storage');
                     this.isConfigured = false;
@@ -166,7 +166,7 @@ const SupabaseSync = {
 
             const data = await response.json();
             console.log('[SupabaseSync.getDataByIds] Received', Array.isArray(data) ? data.length : 0, 'records');
-            
+
             const result = {};
 
             if (Array.isArray(data)) {
@@ -205,7 +205,7 @@ const SupabaseSync = {
 
         try {
             const url = `${SupabaseClient.url}/rest/v1/${TABLE}?car_id=eq.${encodeURIComponent(carId)}`;
-            
+
             console.log('[SupabaseSync.getCarData] ========== SUPABASE API REQUEST ==========');
             console.log('[SupabaseSync.getCarData] Method: GET');
             console.log('[SupabaseSync.getCarData] URL:', url);
@@ -264,10 +264,10 @@ const SupabaseSync = {
     // SAVE: Update or insert car data (notes + separate feature columns)
     async saveCarData(carId, noteData, featuresData) {
         console.log('[SupabaseSync.saveCarData] Called with:', { carId, noteData, featuresData });
-        
+
         const isReady = await SupabaseClient.isReady();
         console.log('[SupabaseSync.saveCarData] Supabase ready?', isReady);
-        
+
         if (!isReady) {
             console.error('[SupabaseSync.saveCarData] Supabase not configured');
             return { success: false, reason: 'not_configured', conflict: false };
@@ -301,7 +301,7 @@ const SupabaseSync = {
             console.log('[SupabaseSync.saveCarData] Headers: Content-Type: application/json');
             console.log('[SupabaseSync.saveCarData] Body:', JSON.stringify(updatePayload, null, 2));
             console.log('[SupabaseSync.saveCarData] ==========================================');
-            
+
             const updateResponse = await fetch(updateUrl, {
                 method: 'PATCH',
                 headers: {
@@ -333,7 +333,7 @@ const SupabaseSync = {
             } catch (e) {
                 console.warn('[SupabaseSync.saveCarData] Response is not JSON:', responseText);
             }
-            
+
             console.log('[SupabaseSync.saveCarData] Updated rows:', updatedRows);
 
             // If update was successful (rows affected)
@@ -429,7 +429,7 @@ const SupabaseSync = {
     async getCarFeatures(carId) {
         console.log('[SupabaseSync.getCarFeatures] Called for car ID:', carId);
         const data = await this.getCarData(carId);
-        
+
         if (data && data.features) {
             const result = {
                 features: data.features,
@@ -439,7 +439,7 @@ const SupabaseSync = {
             console.log('[SupabaseSync.getCarFeatures] Returning features:', Object.keys(data.features).length, 'features found');
             return result;
         }
-        
+
         console.log('[SupabaseSync.getCarFeatures] No features found');
         return null;
     },
@@ -482,7 +482,7 @@ const SupabaseSync = {
 // Message listener for content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('[Background.onMessage] Received request:', request.action, request);
-    
+
     if (request.action === 'saveCarFeatures') {
         console.log('[Background] Handling saveCarFeatures for carId:', request.carId);
         SupabaseSync.saveCarFeatures(request.carId, request.featuresData)

@@ -103,11 +103,11 @@ window.FeaturesManager = {
     async updateFeature(carId, featureName, state) {
         // state: true, false, or null
         console.log(`[FeaturesManager.updateFeature] Updating ${featureName} to ${state} for car ${carId}`);
-        
+
         // Get current state
         let current = await this.sendMessage('getCarFeatures', { carId });
         console.log(`[FeaturesManager.updateFeature] Fetched current data:`, current);
-        
+
         // If no existing data (new car), create new record with all features from UI
         // Get the current features from the UnifiedPanel to preserve all features
         if (!current) {
