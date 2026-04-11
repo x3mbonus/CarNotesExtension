@@ -154,7 +154,7 @@ async function showNoteModal(carId, existingNote, article) {
     }
 
     const state = {
-        color: existingNote?.color || '#607D8B',
+        color: existingNote?.color || '#e0e0e0',  // Default to gray (no rating) for new notes
         text: existingNote?.text || '',
         sort: existingNote?.sort ?? null,  // Default to "no rating" for new notes
         confirmed: existingNote?.confirmed || false,
@@ -220,6 +220,20 @@ async function showNoteModal(carId, existingNote, article) {
         state.sort,
         (sortId) => {
             state.sort = sortId;
+            // Update note color when rating changes
+            const ratingColors = {
+                'null': '#e0e0e0',
+                '0': '#2E7D32',
+                '1': '#CDDC39',
+                '2': '#FDD835',
+                '3': '#FF7043',
+                '-1': '#F44336'
+            };
+            const colorKey = sortId === null ? 'null' : sortId.toString();
+            if (ratingColors[colorKey]) {
+                state.color = ratingColors[colorKey];
+                updateNoteTextarea();
+            }
         }
     ));
     contentArea.appendChild(ratingSection);
@@ -274,10 +288,11 @@ async function showNoteModal(carId, existingNote, article) {
         e.preventDefault();
         e.stopPropagation();
 
-        if (!state.text.trim()) {
-            alert('Please enter a note');
-            return;
-        }
+        // Note text is now optional - user can just select rating/features
+        // if (!state.text.trim()) {
+        //     alert('Please enter a note');
+        //     return;
+        // }
 
         const noteResult = await saveNote(carId, {
             text: state.text,

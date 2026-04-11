@@ -6,7 +6,7 @@ window.CarDetailPanel = {
     isVerified: false,
     currentSort: -1,  // -1 = excluded, 0-3 = sort levels
     currentNote: '',
-    currentColor: '#607D8B',  // Default to first color in palette (dark blue-gray)
+    currentColor: '#e0e0e0',  // Default to gray (no rating) for new notes
     // Metadata fields
     currentSeatType: '',
     currentClimate: '',
@@ -82,7 +82,7 @@ window.CarDetailPanel = {
             console.log('[CarDetailPanel] getNote returned:', noteData);
             if (noteData) {
                 this.currentNote = noteData.text || '';
-                this.currentColor = noteData.color || '#607D8B';  // Default to first color if not set
+                this.currentColor = noteData.color || '#e0e0e0';  // Default to gray (no rating) if not set
                 // Load metadata from note data
                 this.currentSeatType = noteData.seat_type || '';
                 this.currentClimate = noteData.climate || '';

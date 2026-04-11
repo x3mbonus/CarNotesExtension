@@ -2,16 +2,27 @@
 // Used by both CarDetailPanel and NoteModal
 
 window.UIComponents = {
-    // Render color picker grid
+    // Render color picker grid - first color (gray) is default
     createColorGrid(colors, currentColor, onColorSelect) {
         const container = document.createElement('div');
         container.style.cssText = 'display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;';
 
-        colors.forEach(color => {
+        // Default to first color if none specified
+        const selectedColor = currentColor || colors[0];
+
+        colors.forEach((color, index) => {
             const btn = document.createElement('button');
-            btn.className = currentColor === color ? 'ui-color-btn selected' : 'ui-color-btn';
+            btn.className = selectedColor === color ? 'ui-color-btn selected' : 'ui-color-btn';
             btn.setAttribute('data-color', color);
             btn.style.backgroundColor = color;
+
+            // Visually distinguish rating colors (0-5) from optional colors (6+)
+            // Optional colors have a border to indicate they're optional
+            if (index > 5) {
+                btn.style.border = '2px dashed rgba(0,0,0,0.2)';
+                btn.style.opacity = '0.7';
+            }
+
             btn.onclick = () => onColorSelect(color);
             container.appendChild(btn);
         });
@@ -288,7 +299,22 @@ window.UIComponents = {
 
     // Get standard colors
     getColors() {
-        return ['#607D8B', '#388E3C', '#7CB342', '#FDD835', '#FF7043', '#F44336', '#2196F3', '#9C27B0', '#FFEB3B', '#00BCD4', '#E91E63', '#8B4513'];
+        // Rating-based colors (strongly typed - vibrant)
+        // + Optional colors (muted/desaturated)
+        return [
+            '#e0e0e0',  // No rating (gray) - strongly typed
+            '#2E7D32',  // Best (dark green) - strongly typed
+            '#9CCC65',  // Good (bright lime) - strongly typed
+            '#FDD835',  // Fair (orange-yellow) - strongly typed
+            '#FF7043',  // Poor (orange) - strongly typed
+            '#F44336',  // Excluded (red) - strongly typed
+            '#64B5F6',  // Light blue (muted) - optional
+            '#B39DDB',  // Light purple (muted) - optional
+            '#80DEEA',  // Light cyan (muted) - optional
+            '#FFAB91',  // Light coral (muted) - optional
+            '#A1887F',  // Taupe (muted) - optional
+            '#C2E59C'   // Light green (muted) - optional
+        ];
     },
 
     // Create section label

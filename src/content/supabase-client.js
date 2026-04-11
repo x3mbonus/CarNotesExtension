@@ -262,7 +262,7 @@ window.SupabaseApi = {
             const updatePayload = {
                 ...(noteData && {
                     text: noteData.text,
-                    color: noteData.color || '#607D8B'  // Default to first color
+                    color: noteData.color || '#e0e0e0'  // Default to gray (no rating)
                 }),
                 ...(featuresData && {
                     sort: featuresData.sort || 0,
@@ -312,7 +312,7 @@ window.SupabaseApi = {
             const insertPayload = {
                 car_id: carId,
                 text: noteData?.text || '',
-                color: noteData?.color || '#607D8B',  // Default to first color
+                color: noteData?.color || '#e0e0e0',  // Default to gray (no rating)
                 sort: featuresData?.sort || 0,
                 confirmed: featuresData?.confirmed || false,
                 features_source: featuresData?.featuresSource || null,
@@ -457,13 +457,13 @@ window.SupabaseApi = {
     },
 
     // Save car features (bulk upsert)
-    async saveCarFeaturesNew(carId, features) {
+    async saveCarFeaturesNew(carId, features, confirmed = false) {
         if (!await window.SupabaseClient.isReady()) {
             return { success: false, reason: 'not_configured' };
         }
 
         try {
-            console.log('[SupabaseApi.saveCarFeaturesNew] Saving features for:', carId);
+            console.log('[SupabaseApi.saveCarFeaturesNew] Saving features for:', carId, 'confirmed:', confirmed);
 
             // Ensure car exists in car_data_local (required for foreign key)
             try {
@@ -491,7 +491,7 @@ window.SupabaseApi = {
                         body: JSON.stringify({
                             car_id: carId,
                             text: '',
-                            color: '#607D8B'  // Default first color
+                            color: '#e0e0e0'  // Default gray (no rating)
                         })
                     });
 
@@ -553,7 +553,33 @@ window.SupabaseApi = {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            console.log('[SupabaseApi.saveCarFeaturesNew] ✅ Saved');
+            console.log('[SupabaseApi.saveCarFeaturesNew] ✅ Saved features');
+
+            // Update confirmed status on car_data_local if provided
+            if (confirmed !== false) {
+                try {
+                    console.log('[SupabaseApi.saveCarFeaturesNew] Updating confirmed status to:', confirmed);
+                    const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+                    const updateResponse = await fetch(updateUrl, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': window.SupabaseClient.key,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ confirmed: confirmed })
+                    });
+
+                    if (!updateResponse.ok) {
+                        const errorText = await updateResponse.text();
+                        console.warn('[SupabaseApi.saveCarFeaturesNew] Warning updating confirmed status:', errorText);
+                    } else {
+                        console.log('[SupabaseApi.saveCarFeaturesNew] ✅ Updated confirmed status');
+                    }
+                } catch (updateError) {
+                    console.warn('[SupabaseApi.saveCarFeaturesNew] Warning updating confirmed:', updateError);
+                }
+            }
+
             return { success: true };
         } catch (error) {
             console.error('[SupabaseApi.saveCarFeaturesNew] Error:', error);

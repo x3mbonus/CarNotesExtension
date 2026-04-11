@@ -105,8 +105,8 @@ window.FeaturesManager = {
      * Save features to database using new car_features table
      */
     async saveFeatures(carId, features, sort = null, confirmed = false) {
-        console.log('[FeaturesManager.saveFeatures] Saving', Object.keys(features).length, 'features for car:', carId);
-        return await window.SupabaseApi.saveCarFeaturesNew(carId, features);
+        console.log('[FeaturesManager.saveFeatures] Saving', Object.keys(features).length, 'features for car:', carId, 'confirmed:', confirmed);
+        return await window.SupabaseApi.saveCarFeaturesNew(carId, features, confirmed);
     },
 
     /**

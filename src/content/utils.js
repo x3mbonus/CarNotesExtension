@@ -47,7 +47,7 @@ async function saveNote(carId, noteData) {
     const result = await window.SupabaseApi.saveCarData(carId,
         {
             text: noteData.text,
-            color: noteData.color || '#607D8B'  // Default to first color if not provided
+            color: noteData.color || '#e0e0e0'  // Default to gray (no rating) if not provided
         },
         {
             features: noteData.features || {},

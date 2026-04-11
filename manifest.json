@@ -17,9 +17,6 @@
     "https://cdn.jsdelivr.net/*",
     "https://*.supabase.co/*"
   ],
-  "background": {
-    "service_worker": "src/background/background.js"
-  },
   "options_page": "src/popup/options.html",
   "action": {
     "default_popup": "src/popup/popup.html",
@@ -35,7 +32,7 @@
         "https://*.mobile.de/*",
         "https://*.otomoto.pl/*"
       ],
-      "js": ["src/content/utils.js", "src/content/ui-components.js", "src/content/vehicle-extractor-simple.js", "src/content/features-parser.js", "src/content/feature-column-mapper.js", "src/content/supabase-client.js", "src/content/features-manager.js", "src/content/unified-panel.js", "src/content/extraction-ui.js", "src/content/features-display.js", "src/content/router.js", "src/content/handlers.js", "src/content/sites/mobile-de.js", "src/content/sites/otomoto.js", "src/content/content.js"],
+      "js": ["src/content/utils.js", "src/content/ui-components.js", "src/content/vehicle-extractor-simple.js", "src/content/features-parser.js", "src/content/supabase-client.js", "src/content/features-manager.js", "src/content/unified-panel.js", "src/content/extraction-ui.js", "src/content/router.js", "src/content/handlers.js", "src/content/sites/mobile-de.js", "src/content/sites/otomoto.js", "src/content/content.js"],
       "css": ["src/styles/content.css"],
       "run_at": "document_idle"
     }
