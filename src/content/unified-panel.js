@@ -6,7 +6,7 @@ window.CarDetailPanel = {
     isVerified: false,
     currentSort: -1,  // -1 = excluded, 0-3 = sort levels
     currentNote: '',
-    currentColor: '#FFEB3B',
+    currentColor: '#607D8B',  // Default to first color in palette (dark blue-gray)
     // Metadata fields
     currentSeatType: '',
     currentClimate: '',
@@ -82,7 +82,7 @@ window.CarDetailPanel = {
             console.log('[CarDetailPanel] getNote returned:', noteData);
             if (noteData) {
                 this.currentNote = noteData.text || '';
-                this.currentColor = noteData.color || '#FFEB3B';
+                this.currentColor = noteData.color || '#607D8B';  // Default to first color if not set
                 // Load metadata from note data
                 this.currentSeatType = noteData.seat_type || '';
                 this.currentClimate = noteData.climate || '';
@@ -117,11 +117,12 @@ window.CarDetailPanel = {
             top: 80px;
             right: 0;
             height: calc(100vh - 80px);
-            z-index: 9998;
+            z-index: 10000;
             max-width: 500px;
             width: 100%;
             transition: transform 0.3s ease;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            pointer-events: auto;
         `;
 
         // Main panel
@@ -177,13 +178,28 @@ window.CarDetailPanel = {
             padding: 4px 8px;
             border-radius: 4px;
             transition: all 0.2s;
+            pointer-events: auto;
+            position: relative;
+            z-index: 10001;
         `;
         refreshBtn.onmouseover = () => refreshBtn.style.background = 'rgba(255,255,255,0.3)';
         refreshBtn.onmouseout = () => refreshBtn.style.background = 'rgba(255,255,255,0.2)';
-        refreshBtn.onclick = async () => {
-            console.log('[CarDetailPanel] Refreshing...');
-            await this.showPanel(this.currentCarId);
-        };
+        refreshBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[CarDetailPanel] Refreshing features from database...');
+            try {
+                // Force fresh load from database, bypassing any caches
+                const freshFeatures = await window.SupabaseApi?.getCarFeatures?.(this.currentCarId);
+                if (freshFeatures) {
+                    this.currentFeatures = freshFeatures;
+                    console.log('[CarDetailPanel] Features refreshed:', Object.keys(freshFeatures).length, 'features');
+                    this.updateFeaturesSection();
+                }
+            } catch (error) {
+                console.error('[CarDetailPanel] Error refreshing features:', error);
+            }
+        });
         header.appendChild(refreshBtn);
 
         // Collapse button
@@ -199,13 +215,53 @@ window.CarDetailPanel = {
             padding: 4px 8px;
             border-radius: 4px;
             transition: all 0.2s;
+            z-index: 10001;
+            position: relative;
+            pointer-events: auto;
         `;
         collapseBtn.onmouseover = () => collapseBtn.style.background = 'rgba(255,255,255,0.3)';
         collapseBtn.onmouseout = () => collapseBtn.style.background = 'rgba(255,255,255,0.2)';
-        collapseBtn.onclick = () => this.togglePanel();
+        collapseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[CarDetailPanel] Collapse button clicked');
+            this.togglePanel();
+        });
         header.appendChild(collapseBtn);
 
         panel.appendChild(header);
+
+        // Create expand button (hidden by default, shown when panel collapsed)
+        const expandBtn = document.createElement('button');
+        expandBtn.id = 'unified-panel-expand';
+        expandBtn.textContent = '←';
+        expandBtn.style.cssText = `
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 10002;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: none;  // Hidden until panel is collapsed
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            pointer-events: auto;
+        `;
+        expandBtn.onmouseover = () => expandBtn.style.transform = 'scale(1.1)';
+        expandBtn.onmouseout = () => expandBtn.style.transform = 'scale(1)';
+        expandBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[CarDetailPanel] Expand button clicked');
+            this.togglePanel();
+        });
+        document.body.appendChild(expandBtn);
+        this.expandBtn = expandBtn;
 
         // Scrollable content
         const content = document.createElement('div');
@@ -541,7 +597,16 @@ window.CarDetailPanel = {
             if (confirm('Re-parse features from site? This will overwrite current selections.')) {
                 try {
                     console.log('[CarDetailPanel] Re-parsing features...');
-                    const parsed = window.FeaturesParser?.parseFeatures?.() || {};
+
+                    // Extract page content first (needed for parseFeatures)
+                    const data = window.extractCarData?.();
+                    if (!data) {
+                        alert('Could not extract data from page. Please try again on the listing page.');
+                        return;
+                    }
+
+                    // Parse features from extracted data
+                    const parsed = window.FeaturesParser?.parseFeatures?.(data) || {};
                     const featureConfig = await window.FeaturesManager?.getFeatureConfig?.();
                     const nameToKey = {};
                     featureConfig?.forEach(fc => {
@@ -762,5 +827,10 @@ window.CarDetailPanel = {
 
         this.isExpanded = !this.isExpanded;
         this.wrapperElement.style.transform = this.isExpanded ? 'translateX(0)' : 'translateX(100%)';
+
+        // Show/hide expand button
+        if (this.expandBtn) {
+            this.expandBtn.style.display = this.isExpanded ? 'none' : 'block';
+        }
     }
 };

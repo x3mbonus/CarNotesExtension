@@ -212,9 +212,9 @@ window.SupabaseApi = {
             const result = {};
 
             if (Array.isArray(data)) {
-                data.forEach(row => {
-                    const features = window.FeatureColumnMapper ?
-                        window.FeatureColumnMapper.databaseRowToFeatures(row) : {};
+                for (const row of data) {
+                    // Load features from car_features table (not from columns)
+                    const features = await this.getCarFeatures(row.car_id) || {};
 
                     result[row.car_id] = {
                         text: row.text,
@@ -236,7 +236,7 @@ window.SupabaseApi = {
                         climate: row.climate || null,
                         owners: row.owners || null
                     };
-                });
+                }
             }
 
             return result;
@@ -262,7 +262,7 @@ window.SupabaseApi = {
             const updatePayload = {
                 ...(noteData && {
                     text: noteData.text,
-                    color: noteData.color || '#FFEB3B'
+                    color: noteData.color || '#607D8B'  // Default to first color
                 }),
                 ...(featuresData && {
                     sort: featuresData.sort || 0,
@@ -312,7 +312,7 @@ window.SupabaseApi = {
             const insertPayload = {
                 car_id: carId,
                 text: noteData?.text || '',
-                color: noteData?.color || '#FFEB3B',
+                color: noteData?.color || '#607D8B',  // Default to first color
                 sort: featuresData?.sort || 0,
                 confirmed: featuresData?.confirmed || false,
                 features_source: featuresData?.featuresSource || null,
@@ -491,7 +491,7 @@ window.SupabaseApi = {
                         body: JSON.stringify({
                             car_id: carId,
                             text: '',
-                            color: '#FFEB3B'
+                            color: '#607D8B'  // Default first color
                         })
                     });
 

@@ -31,6 +31,25 @@ window.UIComponents = {
         textarea.style.color = textColor;  // Explicitly set color so it's visible
         textarea.style.fontWeight = '500';  // Make text slightly bolder for better visibility
 
+        // Set placeholder color dynamically - must match text color for consistency
+        // Create a unique style for this textarea's placeholder
+        const uniqueId = 'ta-' + Math.random().toString(36).substr(2, 9);
+        textarea.setAttribute('data-ta-id', uniqueId);
+
+        // Remove any old styles with this pattern (prevents accumulation)
+        document.querySelectorAll(`style[data-ta-style]`).forEach(style => {
+            if (!document.querySelector(`[data-ta-id="${style.dataset.taPlaceholder}"]`)) {
+                style.remove();
+            }
+        });
+
+        // Create and inject placeholder style
+        const placeholderStyle = document.createElement('style');
+        placeholderStyle.setAttribute('data-ta-style', 'true');
+        placeholderStyle.setAttribute('data-ta-placeholder', uniqueId);
+        placeholderStyle.textContent = `[data-ta-id="${uniqueId}"]::placeholder { color: ${textColor}; opacity: 0.8; }`;
+        document.head.appendChild(placeholderStyle);
+
         if (onInput) {
             textarea.addEventListener('input', onInput);
         }
@@ -52,6 +71,8 @@ window.UIComponents = {
             { value: '-1', label: '🚫 Excluded', color: '#F44336' }
         ];
 
+        let selectedColor = '#e0e0e0'; // Default to "No rating" color
+
         options.forEach(opt => {
             const optionEl = document.createElement('option');
             optionEl.value = opt.value;
@@ -62,14 +83,32 @@ window.UIComponents = {
                              (currentSort === -1 && opt.value === '-1');
             if (isSelected) {
                 optionEl.selected = true;
+                selectedColor = opt.color;
             }
             select.appendChild(optionEl);
         });
+
+        // Apply the selected color to the dropdown
+        select.style.backgroundColor = selectedColor;
+        select.style.color = window.getTextColorForBackground(selectedColor);
+        select.style.fontWeight = '500';
+        select.style.padding = '6px 8px';
+        select.style.border = '1px solid #ccc';
+        select.style.borderRadius = '4px';
+        select.style.cursor = 'pointer';
 
         if (onRatingChange) {
             select.addEventListener('change', (e) => {
                 const val = e.target.value;
                 const sortId = val === 'null' ? null : parseInt(val);
+
+                // Update the dropdown color to match the selected option
+                const selectedOption = options.find(opt => opt.value === val);
+                if (selectedOption) {
+                    select.style.backgroundColor = selectedOption.color;
+                    select.style.color = window.getTextColorForBackground(selectedOption.color);
+                }
+
                 onRatingChange(sortId);
             });
         }
@@ -110,7 +149,7 @@ window.UIComponents = {
             if (state === true) {
                 btn.classList.add('active');
                 btn.textContent = `✓ ${feature.label}`;
-                btn.title = 'Click to cycle: Present → Unknown → Missing → Present';
+                btn.title = 'Click to cycle: Unknown (?) → Present (✓) → Missing (✗) → Unknown (?)';
             } else if (state === false) {
                 // Missing state - color depends on priority
                 btn.textContent = `✗ ${feature.label}`;
@@ -124,10 +163,11 @@ window.UIComponents = {
                     // Low priority: WHITE when missing (same as unknown)
                     btn.classList.add('priority-low-missing');
                 }
-                btn.title = 'Click to cycle: Present → Unknown → Missing → Present';
+                btn.title = 'Click to cycle: Unknown (?) → Present (✓) → Missing (✗) → Unknown (?)';
             } else {
-                // state === null (unknown)
+                // state === null (unknown) - initial state
                 btn.textContent = `? ${feature.label}`;
+                btn.title = 'Click to cycle: Unknown (?) → Present (✓) → Missing (✗) → Unknown (?)';
                 if (feature.priority === 2) {
                     // High priority: RED when unknown
                     btn.classList.add('priority-missing');

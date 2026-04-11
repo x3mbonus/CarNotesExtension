@@ -118,15 +118,16 @@ window.FeaturesManager = {
     },
 
     /**
-     * Toggle feature state: true → null → false → true (3-state cycle)
+     * Toggle feature state: null → true → false → null (3-state cycle)
+     * Cycling order: Unknown (?) → Present (✓) → Missing (✗) → Unknown (?)
      */
     toggleFeatureState(currentState) {
-        if (currentState === true) {
-            return null;  // ✓ → ?
-        } else if (currentState === null) {
-            return false; // ? → ✗
+        if (currentState === null) {
+            return true;  // ? → ✓
+        } else if (currentState === true) {
+            return false; // ✓ → ✗
         } else {
-            return true;  // ✗ → ✓
+            return null;  // ✗ → ?
         }
     },
 

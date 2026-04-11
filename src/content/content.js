@@ -156,7 +156,7 @@ async function showNoteModal(carId, existingNote, article) {
     const state = {
         color: existingNote?.color || '#607D8B',
         text: existingNote?.text || '',
-        sort: existingNote?.sort ?? -1,
+        sort: existingNote?.sort ?? null,  // Default to "no rating" for new notes
         confirmed: existingNote?.confirmed || false,
         features: features,
         ...metadata
@@ -258,7 +258,7 @@ async function showNoteModal(carId, existingNote, article) {
         window.UIComponents.getFeaturesList(),
         state.features,
         (featureKey) => {
-            // Toggle through 3 states: true → null → false → true
+            // Toggle through 3 states: unknown (?) → present (✓) → missing (✗) → unknown (?)
             const currentState = state.features[featureKey];
             const nextState = window.FeaturesManager?.toggleFeatureState?.(currentState);
             state.features[featureKey] = nextState;
@@ -294,7 +294,29 @@ async function showNoteModal(carId, existingNote, article) {
 
         if (noteResult.success) {
             closeModal();
-            initializeContentScript();
+
+            // Refresh the specific note display for this car
+            const noteDisplay = document.querySelector(`[data-car-id="${carId}"].car-note-display`);
+            if (noteDisplay) {
+                noteDisplay.remove();
+            }
+
+            // Re-add the note button with updated data to show the saved note
+            if (article) {
+                const savedNote = {
+                    text: state.text,
+                    color: state.color,
+                    createdAt: noteResult.createdAt || existingNote?.createdAt || new Date().toISOString(),
+                    sort: state.sort,
+                    confirmed: state.confirmed,
+                    features: state.features,
+                    seat_type: state.seat_type,
+                    climate: state.climate,
+                    owners: state.owners,
+                    tow_hitch_type: state.tow_hitch_type
+                };
+                await addNoteButton(article, carId, savedNote);
+            }
         } else {
             alert('Failed to save note: ' + (noteResult.error || 'Unknown error'));
         }

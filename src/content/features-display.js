@@ -234,7 +234,7 @@ window.FeaturesDisplay = {
                 label.textContent = featureName;
                 featureBtn.appendChild(label);
 
-                featureBtn.title = 'Click to cycle: Present (✓) → Unknown (?) → Missing (✗) → Present';
+                featureBtn.title = 'Click to cycle: Unknown (?) → Present (✓) → Missing (✗) → Unknown (?)';
 
                 featureBtn.onclick = async () => {
                     await window.FeaturesManager.toggleFeature(this.currentCarId, featureName, state);
