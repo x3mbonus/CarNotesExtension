@@ -51,6 +51,36 @@ window.extractMobileDeCarData = function() {
     }
   });
 
+  // Extract make and model from specs or title
+  // mobile.de often has "Make" and/or "Model" in specs
+  for (const [label, value] of Object.entries(data.specs)) {
+    if (label.toLowerCase().includes('make') || label.toLowerCase().includes('marke')) {
+      data.basics.make = value.trim();
+    }
+    if (label.toLowerCase().includes('model')) {
+      data.basics.model = value.trim();
+    }
+  }
+
+  // Fallback: Extract make and model from title
+  if (!data.basics.make && data.basics.name) {
+    const parts = data.basics.name.split(/[-–•]/);
+    if (parts.length >= 1) {
+      const firstPart = parts[0].trim();
+      const knownMakes = ['Toyota', 'Honda', 'BMW', 'Mercedes', 'Volkswagen', 'Audi', 'Ford', 'Opel', 'Skoda', 'Peugeot', 'Renault', 'Hyundai', 'Kia', 'Fiat', 'Citroen', 'SEAT', 'Mazda', 'Subaru', 'Volvo', 'Jeep', 'Nissan', 'Mitsubishi', 'Suzuki', 'Dodge', 'Chevrolet', 'GMC', 'Tesla', 'Porsche', 'Lamborghini', 'Ferrari', 'Jaguar', 'Range Rover'];
+      if (knownMakes.some(m => firstPart.toLowerCase().includes(m.toLowerCase()))) {
+        data.basics.make = firstPart;
+      }
+    }
+  }
+
+  if (!data.basics.model && data.basics.name) {
+    const parts = data.basics.name.split(/[-–•]/);
+    if (parts.length >= 2) {
+      data.basics.model = parts[1].trim();
+    }
+  }
+
   // Extract features
   document.querySelectorAll('li.FtSYW').forEach(li => {
     const feature = li.innerText.split('\n')[0].trim();
@@ -63,6 +93,31 @@ window.extractMobileDeCarData = function() {
 
   const netPriceElement = document.querySelector('[data-testid="vip-price-label"] .ZD2EM');
   if (netPriceElement) data.price.netInfo = netPriceElement.innerText.trim();
+
+  // Mark price as EUR for mobile.de
+  data.price.currency = 'EUR';
+
+  // Extract year from First Registration
+  const firstRegElement = document.querySelector('[data-testid="vip-key-features-list-item-firstRegistration"]');
+  if (firstRegElement) {
+    const dateText = firstRegElement.querySelector('.geJSa')?.innerText.trim();
+    if (dateText) {
+      // Extract year from "MM/YYYY" format
+      const yearMatch = dateText.match(/(\d{4})/);
+      if (yearMatch) {
+        data.specs['First Registration'] = dateText;
+      }
+    }
+  }
+
+  // Extract mileage
+  const mileageElement = document.querySelector('[data-testid="vip-key-features-list-item-mileage"]');
+  if (mileageElement) {
+    const mileageText = mileageElement.querySelector('.geJSa')?.innerText.trim();
+    if (mileageText) {
+      data.specs['Mileage'] = mileageText;
+    }
+  }
 
   // Extract dealer info
   const dealerNameElement = document.querySelector('[data-testid="vip-dealer-box-content"] .GdlnG');
@@ -151,6 +206,28 @@ window.extractOtomotoCarData = function() {
   if (make && make !== 'Volkswagen') data.basics.make = make;
   if (model && model !== 'Volkswagen') data.basics.model = model;
   if (version && version !== 'Volkswagen') data.basics.version = version;
+
+  // Fallback: Try to extract make and model from title if not found
+  if (!data.basics.make && data.basics.name) {
+    // Split on common delimiters and take first part as make
+    const parts = data.basics.name.split(/[-–•]/);
+    if (parts.length >= 1) {
+      const firstPart = parts[0].trim();
+      // Common make names
+      const knownMakes = ['Toyota', 'Honda', 'BMW', 'Mercedes', 'Volkswagen', 'Audi', 'Ford', 'Opel', 'Skoda', 'Peugeot', 'Renault', 'Hyundai', 'Kia', 'Fiat', 'Citroen', 'SEAT', 'Mazda', 'Subaru', 'Volvo', 'Jeep', 'Nissan', 'Mitsubishi', 'Suzuki', 'Dodge', 'Chevrolet', 'GMC', 'Tesla', 'Porsche', 'Lamborghini', 'Ferrari', 'Jaguar', 'Range Rover'];
+      if (knownMakes.some(m => firstPart.toLowerCase().includes(m.toLowerCase()))) {
+        data.basics.make = firstPart;
+      }
+    }
+  }
+
+  if (!data.basics.model && data.basics.name) {
+    // Split on common delimiters and take second part as model
+    const parts = data.basics.name.split(/[-–•]/);
+    if (parts.length >= 2) {
+      data.basics.model = parts[1].trim();
+    }
+  }
 
   // Extract price
   const priceAmount = document.querySelector('.offer-price__number');

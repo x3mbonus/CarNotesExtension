@@ -32,7 +32,7 @@
         "https://*.mobile.de/*",
         "https://*.otomoto.pl/*"
       ],
-      "js": ["src/content/utils.js", "src/content/ui-components.js", "src/content/vehicle-extractor-simple.js", "src/content/features-parser.js", "src/content/supabase-client.js", "src/content/features-manager.js", "src/content/unified-panel.js", "src/content/extraction-ui.js", "src/content/router.js", "src/content/handlers.js", "src/content/sites/mobile-de.js", "src/content/sites/otomoto.js", "src/content/content.js"],
+      "js": ["src/content/utils/utils.js", "src/content/utils/note-callbacks.js", "src/content/services/utils/metadata-parser.js", "src/content/components/common/ui-components.js", "src/content/components/common/notes-editor.js", "src/content/services/parsers/vehicle-extractor-simple.js", "src/content/services/parsers/features-parser.js", "src/content/persistence/supabase-client.js", "src/content/services/features-manager.js", "src/content/components/unified-panel/unified-panel.js", "src/content/components/common/extraction-ui.js", "src/content/entry/router.js", "src/content/entry/handlers.js", "src/content/services/parsers/mobilede/mobile-de.js", "src/content/services/parsers/otomoto/otomoto.js", "src/content/entry/content.js"],
       "css": ["src/styles/content.css"],
       "run_at": "document_idle"
     }

@@ -6,10 +6,10 @@
 // ========================================
 // Change ENV_SUFFIX to switch between environments:
 //   '_local'  = Development (use _local suffix on tables)
-//   '_prod'   = Production (use _prod suffix on tables)
+//   ''   = Production (use _prod suffix on tables)
 // ========================================
-const ENV_SUFFIX = '_local';
-// const ENV_SUFFIX = '_prod';
+// const ENV_SUFFIX = '_local';
+const ENV_SUFFIX = '';
 
 const TABLE_CAR_DATA = `car_data${ENV_SUFFIX}`;
 const TABLE_FEATURES_CONFIG = `features_config${ENV_SUFFIX}`;
@@ -168,19 +168,83 @@ window.SupabaseApi = {
                     make: row.make || null,
                     model: row.model || null,
                     price: row.price || null,
+                    price_eur: row.price_eur || null,
                     year: row.year || null,
                     mileage: row.mileage || null,
                     address: row.address || null,
                     interior: row.interior || null,
                     seat_type: row.seat_type || null,
                     climate: row.climate || null,
-                    owners: row.owners || null
+                    owners: row.owners || null,
+                    tow_hitch_type: row.tow_hitch_type || null
                 };
             }
 
             return null;
         } catch (error) {
             console.error('[SupabaseApi.getCarData] Error:', error);
+            return null;
+        }
+    },
+
+    // Get only car metadata WITHOUT fetching features (avoids duplicate requests)
+    async getCarDataMetadataOnly(carId) {
+        if (!await window.SupabaseClient.isReady()) {
+            console.log('[SupabaseApi] Not configured');
+            return null;
+        }
+
+        try {
+            const url = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            console.log('[SupabaseApi.getCarDataMetadataOnly] GET', url);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[SupabaseApi] Error:', response.status, errorText);
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[SupabaseApi.getCarDataMetadataOnly] Response:', data);
+
+            if (Array.isArray(data) && data.length > 0) {
+                const row = data[0];
+
+                // Don't fetch features - caller should already have them
+                return {
+                    text: row.text,
+                    color: row.color,
+                    createdAt: row.created_at,
+                    updatedAt: row.updated_at,
+                    sort: row.sort,
+                    confirmed: row.confirmed || false,
+                    featuresSource: row.features_source || null,
+                    make: row.make || null,
+                    model: row.model || null,
+                    price: row.price || null,
+                    price_eur: row.price_eur || null,
+                    year: row.year || null,
+                    mileage: row.mileage || null,
+                    address: row.address || null,
+                    interior: row.interior || null,
+                    seat_type: row.seat_type || null,
+                    climate: row.climate || null,
+                    owners: row.owners || null,
+                    tow_hitch_type: row.tow_hitch_type || null
+                };
+            }
+
+            return null;
+        } catch (error) {
+            console.error('[SupabaseApi.getCarDataMetadataOnly] Error:', error);
             return null;
         }
     },
@@ -228,13 +292,15 @@ window.SupabaseApi = {
                         make: row.make || null,
                         model: row.model || null,
                         price: row.price || null,
+                        price_eur: row.price_eur || null,
                         year: row.year || null,
                         mileage: row.mileage || null,
                         address: row.address || null,
                         interior: row.interior || null,
                         seat_type: row.seat_type || null,
                         climate: row.climate || null,
-                        owners: row.owners || null
+                        owners: row.owners || null,
+                        tow_hitch_type: row.tow_hitch_type || null
                     };
                 }
             }
@@ -272,6 +338,9 @@ window.SupabaseApi = {
                 ...(metadata.make && { make: metadata.make }),
                 ...(metadata.model && { model: metadata.model }),
                 ...(metadata.price && { price: metadata.price }),
+                ...(metadata.price_eur && { price_eur: metadata.price_eur }),
+                ...(metadata.mileage && { mileage: metadata.mileage }),
+                ...(metadata.year && { year: metadata.year }),
                 ...(metadata.seat_type && { seat_type: metadata.seat_type }),
                 ...(metadata.climate && { climate: metadata.climate }),
                 ...(metadata.owners && { owners: metadata.owners }),
@@ -319,6 +388,9 @@ window.SupabaseApi = {
                 make: metadata.make || null,
                 model: metadata.model || null,
                 price: metadata.price || null,
+                price_eur: metadata.price_eur || null,
+                mileage: metadata.mileage || null,
+                year: metadata.year || null,
                 seat_type: metadata.seat_type || null,
                 climate: metadata.climate || null,
                 owners: metadata.owners || null,
@@ -347,6 +419,316 @@ window.SupabaseApi = {
             return { success: true };
         } catch (error) {
             console.error('[SupabaseApi.saveCarData] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Update only note text and color (independent operation)
+    async updateNoteText(carId, text, color) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = {
+                text: text,
+                color: color || '#e0e0e0',
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.updateNoteText] PATCH', updateUrl, payload);
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[SupabaseApi.updateNoteText] Failed:', response.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log('[SupabaseApi.updateNoteText] ✅ Updated');
+            return { success: true };
+        } catch (error) {
+            console.error('[SupabaseApi.updateNoteText] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Upsert note text and color - INSERT if not exists, UPDATE if exists
+    async upsertNoteText(carId, text, color) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            // First, try to PATCH (update)
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = {
+                text: text,
+                color: color || '#e0e0e0',
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.upsertNoteText] PATCH', updateUrl, payload);
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[SupabaseApi.upsertNoteText] PATCH failed:', response.status, errorText);
+                // Fall through to INSERT
+            } else {
+                const updated = await response.json();
+                if (Array.isArray(updated) && updated.length > 0) {
+                    console.log('[SupabaseApi.upsertNoteText] ✅ Updated existing record');
+                    return { success: true };
+                }
+                // No rows updated, need to INSERT
+            }
+
+            // Record doesn't exist, INSERT it
+            console.log('[SupabaseApi.upsertNoteText] No existing record, creating new one...');
+            const insertUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}`;
+            const insertPayload = {
+                car_id: carId,
+                text: text,
+                color: color || '#e0e0e0',
+                sort: null,  // Explicitly set to null (no rating)
+                confirmed: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.upsertNoteText] POST', insertUrl, insertPayload);
+
+            const insertResponse = await fetch(insertUrl, {
+                method: 'POST',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(insertPayload)
+            });
+
+            if (!insertResponse.ok) {
+                const errorText = await insertResponse.text();
+                console.warn('[SupabaseApi.upsertNoteText] INSERT failed:', insertResponse.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log('[SupabaseApi.upsertNoteText] ✅ Created new record');
+            return { success: true };
+        } catch (error) {
+            console.error('[SupabaseApi.upsertNoteText] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Upsert note with both color AND sort in single request
+    async upsertNoteTextWithSort(carId, text, color, sort) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            // First, try to PATCH (update)
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = {
+                text: text,
+                color: color || '#e0e0e0',
+                sort: sort === undefined ? null : sort,  // Ensure sort is saved
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.upsertNoteTextWithSort] PATCH', updateUrl, payload);
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[SupabaseApi.upsertNoteTextWithSort] PATCH failed:', response.status, errorText);
+                // Fall through to INSERT
+            } else {
+                const updated = await response.json();
+                if (Array.isArray(updated) && updated.length > 0) {
+                    console.log('[SupabaseApi.upsertNoteTextWithSort] ✅ Updated existing record');
+                    return { success: true };
+                }
+                // No rows updated, need to INSERT
+            }
+
+            // Record doesn't exist, INSERT it
+            console.log('[SupabaseApi.upsertNoteTextWithSort] No existing record, creating new one...');
+            const insertUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}`;
+            const insertPayload = {
+                car_id: carId,
+                text: text,
+                color: color || '#e0e0e0',
+                sort: sort === undefined ? null : sort,  // Explicitly set sort
+                confirmed: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.upsertNoteTextWithSort] POST', insertUrl, insertPayload);
+
+            const insertResponse = await fetch(insertUrl, {
+                method: 'POST',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(insertPayload)
+            });
+
+            if (!insertResponse.ok) {
+                const errorText = await insertResponse.text();
+                console.warn('[SupabaseApi.upsertNoteTextWithSort] INSERT failed:', insertResponse.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log('[SupabaseApi.upsertNoteTextWithSort] ✅ Created new record with color and sort');
+            return { success: true };
+        } catch (error) {
+            console.error('[SupabaseApi.upsertNoteTextWithSort] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Update only sort/rating (independent operation)
+    async updateSort(carId, sort) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = {
+                sort: sort,
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.updateSort] PATCH', updateUrl, payload);
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[SupabaseApi.updateSort] Failed:', response.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log('[SupabaseApi.updateSort] ✅ Updated');
+            return { success: true };
+        } catch (error) {
+            console.error('[SupabaseApi.updateSort] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Update only verified/confirmed status (independent operation)
+    async updateConfirmed(carId, confirmed) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = {
+                confirmed: confirmed,
+                updated_at: new Date().toISOString()
+            };
+
+            console.log('[SupabaseApi.updateConfirmed] PATCH', updateUrl, payload);
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[SupabaseApi.updateConfirmed] Failed:', response.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log('[SupabaseApi.updateConfirmed] ✅ Updated');
+            return { success: true };
+        } catch (error) {
+            console.error('[SupabaseApi.updateConfirmed] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Update only metadata field (independent operation)
+    async updateMetadataField(carId, fieldName, fieldValue) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = {
+                [fieldName]: fieldValue,
+                updated_at: new Date().toISOString()
+            };
+
+            console.log(`[SupabaseApi.updateMetadataField] PATCH ${fieldName}=`, fieldValue);
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[SupabaseApi.updateMetadataField] Failed:', response.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log(`[SupabaseApi.updateMetadataField] ✅ Updated ${fieldName}`);
+            return { success: true };
+        } catch (error) {
+            console.error('[SupabaseApi.updateMetadataField] Error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -416,12 +798,13 @@ window.SupabaseApi = {
         }
     },
 
-    // Get all features for a specific car
+    // Get all features for a specific car (lightweight - only state + feature_id, no config joins)
     async getCarFeatures(carId) {
         if (!await window.SupabaseClient.isReady()) return {};
 
         try {
-            const url = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_FEATURES}?car_id=eq.${encodeURIComponent(carId)}&select=${TABLE_FEATURES_CONFIG}(key,name_uk,priority,multiplier),state`;
+            // Only fetch feature_id and state - NO JOIN with config table
+            const url = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_FEATURES}?car_id=eq.${encodeURIComponent(carId)}&select=feature_id,state`;
             console.log('[SupabaseApi.getCarFeatures] GET', url);
 
             const response = await fetch(url, {
@@ -440,12 +823,19 @@ window.SupabaseApi = {
             const data = await response.json();
             console.log('[SupabaseApi.getCarFeatures] Got', data.length, 'features for', carId);
 
+            // Get cached feature config to map feature_id to key (use FeaturesManager cache)
+            const featureConfig = await window.FeaturesManager?.getFeatureConfig?.() || await this.getFeatureConfig();
+            const idToKey = {};
+            featureConfig.forEach(fc => {
+                idToKey[fc.id] = fc.key;
+            });
+
             // Convert to object: { key: state }
             const features = {};
-            const configColumnName = TABLE_FEATURES_CONFIG;
             data.forEach(row => {
-                if (row[configColumnName]) {
-                    features[row[configColumnName].key] = row.state;
+                const key = idToKey[row.feature_id];
+                if (key) {
+                    features[key] = row.state;
                 }
             });
 
@@ -457,7 +847,7 @@ window.SupabaseApi = {
     },
 
     // Save car features (bulk upsert)
-    async saveCarFeaturesNew(carId, features, confirmed = false) {
+    async saveCarFeaturesNew(carId, features, sort = null, confirmed = false) {
         if (!await window.SupabaseClient.isReady()) {
             return { success: false, reason: 'not_configured' };
         }
@@ -491,7 +881,11 @@ window.SupabaseApi = {
                         body: JSON.stringify({
                             car_id: carId,
                             text: '',
-                            color: '#e0e0e0'  // Default gray (no rating)
+                            color: '#e0e0e0',  // Default gray (no rating)
+                            sort: null,         // Explicitly set to null (no rating) - NOT 5 stars
+                            confirmed: false,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
                         })
                     });
 
@@ -508,8 +902,8 @@ window.SupabaseApi = {
                 // Continue anyway
             }
 
-            // First, get feature config to map keys to IDs
-            const featureConfig = await this.getFeatureConfig();
+            // First, get feature config to map keys to IDs (use FeaturesManager cache)
+            const featureConfig = await window.FeaturesManager?.getFeatureConfig?.() || await this.getFeatureConfig();
             const keyToId = {};
             featureConfig.forEach(fc => {
                 keyToId[fc.key] = fc.id;
@@ -555,10 +949,19 @@ window.SupabaseApi = {
 
             console.log('[SupabaseApi.saveCarFeaturesNew] ✅ Saved features');
 
-            // Update confirmed status on car_data_local if provided
-            if (confirmed !== false) {
+            // Update sort and confirmed status on car_data_local
+            if ((sort !== null && sort !== undefined) || (confirmed !== undefined && confirmed !== null)) {
                 try {
-                    console.log('[SupabaseApi.saveCarFeaturesNew] Updating confirmed status to:', confirmed);
+                    const updatePayload = {};
+                    if (sort !== null && sort !== undefined) {
+                        console.log('[SupabaseApi.saveCarFeaturesNew] Updating sort to:', sort);
+                        updatePayload.sort = sort;
+                    }
+                    if (confirmed !== undefined && confirmed !== null) {
+                        console.log('[SupabaseApi.saveCarFeaturesNew] Updating confirmed status to:', confirmed);
+                        updatePayload.confirmed = confirmed;
+                    }
+
                     const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
                     const updateResponse = await fetch(updateUrl, {
                         method: 'PATCH',
@@ -566,17 +969,17 @@ window.SupabaseApi = {
                             'apikey': window.SupabaseClient.key,
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ confirmed: confirmed })
+                        body: JSON.stringify(updatePayload)
                     });
 
                     if (!updateResponse.ok) {
                         const errorText = await updateResponse.text();
-                        console.warn('[SupabaseApi.saveCarFeaturesNew] Warning updating confirmed status:', errorText);
+                        console.warn('[SupabaseApi.saveCarFeaturesNew] Warning updating car_data:', errorText);
                     } else {
-                        console.log('[SupabaseApi.saveCarFeaturesNew] ✅ Updated confirmed status');
+                        console.log('[SupabaseApi.saveCarFeaturesNew] ✅ Updated car_data with sort and/or confirmed');
                     }
                 } catch (updateError) {
-                    console.warn('[SupabaseApi.saveCarFeaturesNew] Warning updating confirmed:', updateError);
+                    console.warn('[SupabaseApi.saveCarFeaturesNew] Warning updating car_data:', updateError);
                 }
             }
 
@@ -594,8 +997,8 @@ window.SupabaseApi = {
         }
 
         try {
-            // Get feature ID from key
-            const featureConfig = await this.getFeatureConfig();
+            // Get feature ID from key (use FeaturesManager cache)
+            const featureConfig = await window.FeaturesManager?.getFeatureConfig?.() || await this.getFeatureConfig();
             const feature = featureConfig.find(f => f.key === featureKey);
 
             if (!feature) {
@@ -603,6 +1006,8 @@ window.SupabaseApi = {
                 return { success: false, error: 'Feature not found' };
             }
 
+            // Get feature ID
+            // Note: featureConfig was fetched above via getFeatureConfig
             // Check if record exists
             const checkUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_FEATURES}?car_id=eq.${encodeURIComponent(carId)}&feature_id=eq.${feature.id}`;
             const checkResponse = await fetch(checkUrl, {

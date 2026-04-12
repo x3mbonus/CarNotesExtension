@@ -11,6 +11,10 @@ let initializeTimer = null; // Debounce timer
     if (window.SupabaseClient) {
         await window.SupabaseClient.init();
     }
+    // Cache features config globally on startup
+    if (window.FeaturesManager) {
+        await window.FeaturesManager.getFullFeaturesConfig();
+    }
 })();
 
 // Initialize
@@ -65,12 +69,17 @@ async function addNoteButton(article, carId, dbNote = null) {
     if (note) {
         // Display the note
         const textColor = getTextColorForBackground(note.color);
-        noteDisplay.innerHTML = `
-            <div class="car-note-content" style="background-color: ${note.color}; color: ${textColor};">
-                <div class="car-note-text">${escapeHtml(note.text)}</div>
-                <button type="button" class="car-note-edit-btn" data-car-id="${carId}" title="Edit note">✏️</button>
-            </div>
+        // Add 'no-background' class if note has no text AND color is gray (default no-rating)
+        const isDefaultColor = note.color === '#e0e0e0' || !note.color;
+        const noBackground = (!note.text || note.text.trim() === '') && isDefaultColor;
+
         `;
+        // Add class to container for styling
+        if (noBackground) {
+            noteDisplay.classList.add('no-background-container');
+            noteDisplay.style.borderBottom = 'none';
+            noteDisplay.style.paddingBottom = '0';
+        }
     } else {
         // Display empty state with pencil button only if carId is valid
         noteDisplay.innerHTML = `
@@ -127,11 +136,19 @@ async function showNoteModal(carId, existingNote, article) {
     // Create modal backdrop
     const backdrop = document.createElement('div');
     backdrop.className = 'car-note-modal-backdrop';
-    backdrop.addEventListener('click', closeModal);
+    backdrop.style.zIndex = '9999';  // Ensure backdrop is on top
+    backdrop.style.pointerEvents = 'auto';  // Enable clicks
+    backdrop.addEventListener('click', (e) => {
+        // Only close if clicking on the backdrop itself, not on modal content
+        if (e.target === backdrop) {
+            closeModal();
+        }
+    });
 
     // Create modal
     const modal = document.createElement('div');
     modal.className = 'car-note-modal';
+    modal.style.zIndex = '10000';  // Ensure modal is above backdrop and carousel
 
     // Initialize state from existing note or defaults
     let features = existingNote?.features || {};
@@ -187,12 +204,25 @@ async function showNoteModal(carId, existingNote, article) {
     // ===== NOTES SECTION =====
     const noteSection = document.createElement('div');
     noteSection.className = 'modal-section';
+    noteSection.style.position = 'relative';
+    noteSection.style.zIndex = '10001';  // Ensure notes stay above modal
     noteSection.appendChild(window.UIComponents.createSectionLabel('NOTES'));
     noteSection.appendChild(window.UIComponents.createColorGrid(
         window.UIComponents.getColors(),
         state.color,
-        (color) => {
+        (color, colorIndex) => {
+            // Color selection mapping to sort values
+            const colorToSortMap = {
+                0: null,     // No rating (gray)
+                1: 0,        // 5 stars (dark green)
+                2: 1,        // 4 stars (green)
+                3: 2,        // 3 stars (yellow)
+                4: 3,        // 2 stars (orange)
+                5: -1        // Excluded (red)
+            };
+
             state.color = color;
+            state.sort = colorToSortMap[colorIndex] !== undefined ? colorToSortMap[colorIndex] : null;
             updateNoteTextarea();
         }
     ));
@@ -211,32 +241,6 @@ async function showNoteModal(carId, existingNote, article) {
         textarea.style.backgroundColor = state.color;
         textarea.style.color = window.getTextColorForBackground(state.color);
     }
-
-    // ===== RATING SECTION =====
-    const ratingSection = document.createElement('div');
-    ratingSection.className = 'modal-section';
-    ratingSection.appendChild(window.UIComponents.createSectionLabel('RATING'));
-    ratingSection.appendChild(window.UIComponents.createRatingSelect(
-        state.sort,
-        (sortId) => {
-            state.sort = sortId;
-            // Update note color when rating changes
-            const ratingColors = {
-                'null': '#e0e0e0',
-                '0': '#2E7D32',
-                '1': '#CDDC39',
-                '2': '#FDD835',
-                '3': '#FF7043',
-                '-1': '#F44336'
-            };
-            const colorKey = sortId === null ? 'null' : sortId.toString();
-            if (ratingColors[colorKey]) {
-                state.color = ratingColors[colorKey];
-                updateNoteTextarea();
-            }
-        }
-    ));
-    contentArea.appendChild(ratingSection);
 
     // ===== VERIFICATION SECTION =====
     const verifySection = document.createElement('div');

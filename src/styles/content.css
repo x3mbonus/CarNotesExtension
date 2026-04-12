@@ -25,12 +25,13 @@
 }
 
 .ui-color-btn.selected {
-    border-color: #333;
-    box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
+    border: 3px solid #333;
+    box-shadow: inset 0 0 0 1px #666;
 }
 
 .ui-note-textarea {
     width: 100%;
+    height: 150px;
     padding: 12px;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -91,17 +92,17 @@
 
 .ui-features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
 }
 
 .ui-feature-btn {
-    padding: 8px;
+    padding: 6px;
     border: 1px solid #ddd;
     border-radius: 4px;
     background: #f5f5f5;
     color: #666;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -159,41 +160,56 @@
 .ui-metadata-section {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 12px;
-    padding: 8px;
-    background: #f9f9f9;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 4px;
+    background: #fafafa;
     border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid #e8e8e8;
 }
 
 .ui-metadata-field {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 1px;
 }
 
 .ui-metadata-label {
-    font-size: 10px;
+    font-size: 8px;
     font-weight: 700;
-    color: #555;
+    color: #777;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
 }
 
-.ui-metadata-input {
-    padding: 6px 8px;
-    border: 1px solid #ddd;
+.ui-metadata-select {
+    padding: 4px 5px;
+    border: 2px solid #ddd;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 10px;
     font-family: inherit;
     background: white;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
 }
 
-.ui-metadata-input:focus {
+.ui-metadata-select:hover {
+    border-color: #667eea;
+}
+
+.ui-metadata-select:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.ui-metadata-select option {
+    padding: 4px 6px;
+    font-size: 11px;
+    background: white;
+    color: #333;
 }
 
 /* Car Notes Display Styles */
@@ -203,6 +219,12 @@
     padding-bottom: 12px;
     border-bottom: 2px solid #e0e0e0;
     position: relative;
+}
+
+/* Hide border and padding when content has no background */
+.car-note-display:has(.no-background) {
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 /* Detail page note display - fixed positioning */
@@ -223,6 +245,34 @@
     gap: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     animation: noteAppear 0.3s ease;
+}
+
+/* Hide background when text is empty */
+.car-note-content:has(.car-note-text:empty) {
+    background-color: transparent !important;
+    box-shadow: none;
+    padding: 0;
+    display: inline-flex;
+}
+
+.car-note-content:has(.car-note-text:empty) .car-note-text {
+    display: none;
+}
+
+/* Hide background when no rating and no text */
+.car-note-content.no-background {
+    background-color: transparent !important;
+    box-shadow: none;
+    padding: 0;
+    display: inline-flex;
+}
+
+.car-note-content.no-background .car-note-text {
+    display: none;
+}
+
+.car-note-content.empty-text .car-note-text {
+    display: none;
 }
 
 .car-note-text {
@@ -410,20 +460,39 @@
 }
 
 .car-note-modal-delete-btn {
-    background: #ffcdd2;
-    color: #c62828;
+    background: #F44336;
+    color: white;
     border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
+    padding: 4px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: hidden;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    margin-left: auto;
+    padding: 2px;
+}
+
+.car-note-modal-delete-btn.visible {
+    visibility: visible;
+    opacity: 0.5;
+    max-height: 28px;
+    padding: 2px;
 }
 
 .car-note-modal-delete-btn:hover {
-    background: #ff9999;
-    color: #a00;
+    background: #d32f2f;
+    opacity: 1;
+    transform: scale(1.15);
 }
 
 .car-note-modal-cancel-btn,
@@ -455,30 +524,30 @@
 
 /* Modal Sections */
 .modal-section {
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
     border-bottom: 1px solid #eee;
 }
 
 .modal-section label {
     display: block;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 600;
     color: #666;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     text-transform: uppercase;
 }
 
 .modal-color-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(32px, 1fr));
-    gap: 6px;
-    margin-bottom: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(28px, 1fr));
+    gap: 4px;
+    margin-bottom: 4px;
 }
 
 .modal-color-btn {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border: 2px solid #ddd;
     border-radius: 4px;
     cursor: pointer;

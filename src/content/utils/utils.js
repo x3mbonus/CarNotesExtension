@@ -36,7 +36,18 @@ async function getNote(carId) {
             updatedAt: data.updatedAt,
             sort: data.sort,
             confirmed: data.confirmed || false,
-            features: data.features || {}
+            features: data.features || {},
+            // Metadata fields - all stored in database
+            make: data.make || '',
+            model: data.model || '',
+            price: data.price || '',
+            price_eur: data.price_eur || '',
+            mileage: data.mileage || '',
+            year: data.year || '',
+            seat_type: data.seat_type || '',
+            climate: data.climate || '',
+            owners: data.owners || '',
+            tow_hitch_type: data.tow_hitch_type || ''
         };
     }
     return null;
@@ -56,6 +67,12 @@ async function saveNote(carId, noteData) {
             featuresSource: 'manual'
         },
         {
+            make: noteData.make,
+            model: noteData.model,
+            price: noteData.price,
+            price_eur: noteData.price_eur,
+            mileage: noteData.mileage,
+            year: noteData.year,
             seat_type: noteData.seat_type,
             climate: noteData.climate,
             owners: noteData.owners,
