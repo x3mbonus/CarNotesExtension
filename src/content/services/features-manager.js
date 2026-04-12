@@ -77,11 +77,25 @@ window.FeaturesManager = {
     /**
      * Get feature config - load once and cache globally (with localStorage backup)
      */
-    async getFeatureConfig() {
-        // Check in-memory cache first
-        if (this.featureConfigCache) {
+    async getFeatureConfig(forceRefresh = false) {
+        // Check in-memory cache first (unless forcing refresh)
+        if (!forceRefresh && this.featureConfigCache) {
             console.log('[FeaturesManager.getFeatureConfig] ✅ In-memory cache HIT');
             return this.featureConfigCache;
+        }
+
+        // If forcing refresh, skip cache and go straight to API
+        if (forceRefresh) {
+            console.log('[FeaturesManager.getFeatureConfig] 🔄 FORCED REFRESH - skipping cache');
+            try {
+                this.featureConfigCache = await window.SupabaseApi.getFeatureConfig();
+                this.saveFeatureConfigToStorage(this.featureConfigCache);
+                console.log('[FeaturesManager.getFeatureConfig] ✅ Refreshed from API:', this.featureConfigCache.length, 'features');
+                return this.featureConfigCache;
+            } catch (error) {
+                console.error('[FeaturesManager.getFeatureConfig] Refresh failed:', error);
+                return [];
+            }
         }
 
         // Check localStorage with expiration

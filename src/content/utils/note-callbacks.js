@@ -76,7 +76,6 @@ window.NoteCallbacks = {
      * Update single metadata field (independent operation)
      */
     async updateMetadataField(carId, fieldName, fieldValue) {
-        console.log('[NoteCallbacks.updateMetadataField] Updating', fieldName, 'to', fieldValue, 'for', carId);
         return await window.SupabaseApi?.updateMetadataField?.(carId, fieldName, fieldValue) || { success: true };
     },
 
@@ -84,8 +83,23 @@ window.NoteCallbacks = {
      * Update single feature (independent operation)
      */
     async updateFeature(carId, featureKey, state) {
-        console.log('[NoteCallbacks.updateFeature] Updating feature', featureKey, 'to', state, 'for', carId);
-        return await window.SupabaseApi?.updateCarFeature?.(carId, featureKey, state) || { success: true };
+        if (!window.SupabaseApi) {
+            console.error('[NoteCallbacks.updateFeature] ❌ window.SupabaseApi is NOT initialized!');
+            return { success: false, error: 'SupabaseApi not initialized' };
+        }
+
+        if (typeof window.SupabaseApi.updateCarFeature !== 'function') {
+            console.error('[NoteCallbacks.updateFeature] ❌ updateCarFeature is not a function!', typeof window.SupabaseApi.updateCarFeature);
+            return { success: false, error: 'updateCarFeature not found' };
+        }
+
+        try {
+            const result = await window.SupabaseApi.updateCarFeature(carId, featureKey, state);
+            return result;
+        } catch (error) {
+            console.error('[NoteCallbacks.updateFeature] ❌ Exception:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**

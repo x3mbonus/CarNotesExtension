@@ -708,8 +708,6 @@ window.SupabaseApi = {
                 updated_at: new Date().toISOString()
             };
 
-            console.log(`[SupabaseApi.updateMetadataField] PATCH ${fieldName}=`, fieldValue);
-
             const response = await fetch(updateUrl, {
                 method: 'PATCH',
                 headers: {
@@ -721,11 +719,10 @@ window.SupabaseApi = {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.warn('[SupabaseApi.updateMetadataField] Failed:', response.status, errorText);
+                console.error('[SupabaseApi.updateMetadataField] Failed:', response.status, errorText);
                 return { success: false, error: errorText };
             }
 
-            console.log(`[SupabaseApi.updateMetadataField] ✅ Updated ${fieldName}`);
             return { success: true };
         } catch (error) {
             console.error('[SupabaseApi.updateMetadataField] Error:', error);
@@ -741,10 +738,31 @@ window.SupabaseApi = {
         }
 
         try {
-            const url = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
-            console.log('[SupabaseApi] DELETE', url);
+            // Step 1: Delete related features first (foreign key constraint)
+            const featureUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_FEATURES}?car_id=eq.${encodeURIComponent(carId)}`;
+            console.log('[SupabaseApi.deleteCarData] DELETE features:', featureUrl);
 
-            const response = await fetch(url, {
+            const featureResponse = await fetch(featureUrl, {
+                method: 'DELETE',
+                headers: {
+                    'apikey': window.SupabaseClient.key,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!featureResponse.ok) {
+                const errorText = await featureResponse.text();
+                console.warn('[SupabaseApi.deleteCarData] Warning deleting features:', featureResponse.status, errorText);
+                // Don't throw - continue to delete car data anyway
+            } else {
+                console.log('[SupabaseApi.deleteCarData] ✅ Deleted related features');
+            }
+
+            // Step 2: Delete the car data itself
+            const carUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            console.log('[SupabaseApi.deleteCarData] DELETE car:', carUrl);
+
+            const response = await fetch(carUrl, {
                 method: 'DELETE',
                 headers: {
                     'apikey': window.SupabaseClient.key,
@@ -754,11 +772,11 @@ window.SupabaseApi = {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('[SupabaseApi] Error:', response.status, errorText);
+                console.error('[SupabaseApi.deleteCarData] Error:', response.status, errorText);
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
-            console.log('✅ Deleted');
+            console.log('[SupabaseApi.deleteCarData] ✅ Deleted car data');
             return { success: true };
         } catch (error) {
             console.error('[SupabaseApi.deleteCarData] Error:', error);
@@ -791,6 +809,17 @@ window.SupabaseApi = {
 
             const data = await response.json();
             console.log('[SupabaseApi.getFeatureConfig] Got', data.length, 'features');
+
+            // DEBUG: Show all feature keys
+            console.log('[SupabaseApi.getFeatureConfig] Feature keys:', data.map(f => f.key).join(', '));
+
+            // DEBUG: Specifically look for camera
+            const hasCamera = data.find(f => f.key === 'feature_camera');
+            console.log('[SupabaseApi.getFeatureConfig] Has feature_camera?', hasCamera ? 'YES ✅' : 'NO ❌');
+            if (hasCamera) {
+                console.log('[SupabaseApi.getFeatureConfig] Camera details:', hasCamera);
+            }
+
             return data || [];
         } catch (error) {
             console.error('[SupabaseApi.getFeatureConfig] Error:', error);
@@ -997,9 +1026,12 @@ window.SupabaseApi = {
         }
 
         try {
-            // Get feature ID from key (use FeaturesManager cache)
-            const featureConfig = await window.FeaturesManager?.getFeatureConfig?.() || await this.getFeatureConfig();
-            const feature = featureConfig.find(f => f.key === featureKey);
+            // Get feature ID from key - FORCE REFRESH to ensure latest features from database
+            const featureConfig = await window.FeaturesManager?.getFeatureConfig?.(true) || await this.getFeatureConfig();
+
+            // Trim all keys in case of whitespace issues in database
+            const trimmedConfig = featureConfig.map(f => ({ ...f, key: f.key.trim() }));
+            const feature = trimmedConfig.find(f => f.key === featureKey.trim());
 
             if (!feature) {
                 console.error('[SupabaseApi.updateCarFeature] Feature not found:', featureKey);
@@ -1007,7 +1039,7 @@ window.SupabaseApi = {
             }
 
             // Get feature ID
-            // Note: featureConfig was fetched above via getFeatureConfig
+            // Note: featureConfig was fetched with force refresh above
             // Check if record exists
             const checkUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_FEATURES}?car_id=eq.${encodeURIComponent(carId)}&feature_id=eq.${feature.id}`;
             const checkResponse = await fetch(checkUrl, {
@@ -1068,3 +1100,5 @@ window.SupabaseApi = {
     }
 };
 
+// Log that SupabaseApi has been initialized
+console.log('[SupabaseApi] ✅ Initialized. updateCarFeature exists:', typeof window.SupabaseApi.updateCarFeature === 'function');

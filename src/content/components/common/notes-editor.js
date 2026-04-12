@@ -393,145 +393,33 @@ window.NotesEditor = {
         const featuresLabel = window.UIComponents.createSectionLabel('FEATURES');
         featuresSection.appendChild(featuresLabel);
 
-        // Add reparse button (disabled in modal, enabled in panel)
+        // Add single "Refresh All" button (only in panel mode, not modal)
         if (displayMode === 'panel' && article) {
-            const reparseBtn = document.createElement('button');
-            reparseBtn.textContent = '↻ Re-parse';
-            reparseBtn.style.cssText = `
+            const clearReparseBtn = document.createElement('button');
+            clearReparseBtn.textContent = '🔄 Refresh All (Clear & Re-parse)';
+            clearReparseBtn.title = 'Clear all metadata (price, mileage, year) and features, then re-parse fresh from page';
+            clearReparseBtn.style.cssText = `
                 margin-left: 8px;
-                padding: 4px 8px;
+                padding: 2px 6px;
                 background: #667eea;
                 color: white;
                 border: none;
                 border-radius: 3px;
                 cursor: pointer;
-                font-size: 11px;
-                pointer-events: auto;
-                position: relative;
-                z-index: 10002;
-            `;
-            reparseBtn.onclick = async (e) => {
-                console.log('[NotesEditor] Re-parse button clicked!');
-                e.preventDefault();
-                e.stopPropagation();
-
-                // Ask for confirmation before re-parsing
-                const confirmMessage = 'Re-parse will update features from the page.\n\nManually marked features will be preserved.\nFeatures not found on page will be reset to unknown (?).\n\nContinue?';
-                if (!confirm(confirmMessage)) {
-                    console.log('[NotesEditor] Re-parse cancelled by user');
-                    return;
-                }
-
-                console.log('[NotesEditor] Re-parsing features from page...');
-                const extracted = window.extractCarData?.();
-                console.log('[NotesEditor] Extracted features array:', extracted?.features);
-                if (extracted?.features && Array.isArray(extracted.features)) {
-                    // Convert extracted array to object format: { feature_key: true }
-                    const newFeatures = { ...state.features }; // Keep existing features
-                    const configList = window.UIComponents?.getFeaturesList?.() || [];
-
-                    // Create a mapping of various names to feature keys for better matching
-                    const featureAliases = {
-                        'camera': ['Камера', 'камера', 'camera', 'Camera'],
-                        'feature_acc': ['ACC', 'acc', 'Adaptive Cruise Control'],
-                        'feature_android_auto_carplay': ['Android Auto', 'CarPlay', 'Android', 'Apple CarPlay'],
-                        'feature_parking_sensors': ['Парктроніки', 'парктроніки', 'Parking sensors', 'Parking'],
-                        'feature_blind_spot': ['Blind spot', 'blind spot monitor', 'BSM'],
-                        'feature_lane_assist': ['Lane assist', 'lane keeping', 'Lane keeping assist'],
-                        'feature_signs': ['Знаки', 'знаки', 'sign recognition'],
-                        'feature_rear_traffic_alert': ['Rear traffic alert', 'traffic alert'],
-                        'feature_traffic_jam_assist': ['Traffic Jam Assist', 'traffic jam'],
-                        'feature_keyless': ['Keyless', 'keyless entry', 'Безключевой доступ'],
-                        'feature_digital_cockpit': ['Digital cockpit', 'Virtual cockpit', 'cockpit'],
-                        'feature_heated_seats': ['Підігрів сидінь', 'підігрів сидінь', 'heated seats', 'Heated seats'],
-                        'feature_heated_windshield': ['Підігрів лобового', 'heated windshield'],
-                        'feature_heated_steering_wheel': ['Підігрів керма', 'heated steering wheel'],
-                        'feature_massage_seats': ['Масаж', 'масаж', 'massage seats'],
-                        'feature_memory_seats': ['Пам\'ять сидінь', 'memory seats'],
-                        'feature_dcc': ['DCC', 'Dynamic Chassis Control'],
-                        'feature_webasto': ['Webasto', 'webasto'],
-                        'feature_matrix_headlights': ['Matrix', 'Matrix lights', 'matrix headlights'],
-                        'feature_auto_parking': ['Автопаркування', 'auto parking', 'automatic parking'],
-                        'feature_360_camera': ['360 камера', '360 camera', '360°'],
-                        'feature_tow_hitch': ['Фаркоп', 'фаркоп', 'Tow hitch', 'tow hook'],
-                        'feature_electric_tailgate': ['Електробагажник', 'electric tailgate'],
-                        'feature_auto_tailgate': ['Автобагажник', 'auto tailgate'],
-                        'feature_panoramic_roof': ['Панорама', 'panoramic roof', 'panorama'],
-                        'feature_hud': ['HUD', 'Head-up display']
-                    };
-
-                    // Mark extracted features as present
-                    extracted.features.forEach(extractedName => {
-                        console.log('[NotesEditor] Trying to match extracted feature:', extractedName);
-                        const lowerExtracted = extractedName.toLowerCase();
-
-                        // Try to find matching feature using aliases
-                        let matched = false;
-                        for (const [featureKey, aliases] of Object.entries(featureAliases)) {
-                            for (const alias of aliases) {
-                                if (lowerExtracted === alias.toLowerCase() ||
-                                    lowerExtracted.includes(alias.toLowerCase()) ||
-                                    alias.toLowerCase().includes(lowerExtracted)) {
-                                    // Find the config feature
-                                    const matchingConfigFeature = configList.find(f =>
-                                        f.label.toLowerCase() === alias.toLowerCase() ||
-                                        f.key === featureKey
-                                    );
-                                    if (matchingConfigFeature) {
-                                        newFeatures[matchingConfigFeature.key] = true;
-                                        console.log('[NotesEditor] ✅ Matched', extractedName, '→', matchingConfigFeature.label);
-                                        matched = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (matched) break;
-                        }
-
-                        if (!matched) {
-                            console.log('[NotesEditor] ⚠️ Could not match extracted feature:', extractedName);
-                        }
-                    });
-
-                    state.features = newFeatures;
-                    console.log('[NotesEditor] Updated state features:', Object.keys(newFeatures).filter(k => newFeatures[k] === true).length, 'marked as present');
-                    updateFeaturesGrid();
-                    console.log('[NotesEditor] Features grid updated');
-                    window.NotesEditor.showSaveNotification('Features re-parsed', 'success', 2000);
-                }
-            };
-            featuresLabel.appendChild(reparseBtn);
-
-            // Add Clear & Re-parse All button
-            const clearReparseBtn = document.createElement('button');
-            clearReparseBtn.textContent = '◄► Clear & Re-parse All';
-            clearReparseBtn.title = 'Clear all metadata and features, then re-parse fresh from page';
-            clearReparseBtn.style.cssText = `
-                margin-left: 8px;
-                padding: 4px 8px;
-                background: #f44336;
-                color: white;
-                border: none;
-                border-radius: 3px;
-                cursor: pointer;
-                font-size: 11px;
+                font-size: 10px;
                 pointer-events: auto;
                 position: relative;
                 z-index: 10002;
             `;
             clearReparseBtn.onclick = async (e) => {
-                console.log('[NotesEditor] Clear & Re-parse All button clicked!');
                 e.preventDefault();
                 e.stopPropagation();
 
                 // Ask for confirmation before clearing and re-parsing
                 const confirmMessage = 'CLEAR & RE-PARSE ALL\n\nThis will:\n• Clear all metadata (price, mileage, year, etc.)\n• Clear all feature selections\n• Re-extract everything fresh from the page\n\nAll manual edits will be LOST!\n\nContinue?';
                 if (!confirm(confirmMessage)) {
-                    console.log('[NotesEditor] Clear & Re-parse All cancelled by user');
                     return;
                 }
-
-                console.log('[NotesEditor] Clearing all data and re-parsing from page...');
 
                 try {
                     // Reset all metadata to empty
@@ -550,18 +438,16 @@ window.NotesEditor = {
                     const configList = window.UIComponents?.getFeaturesList?.() || [];
                     state.features = {};
                     configList.forEach(feature => {
-                        state.features[feature.key] = '?'; // Reset to unknown
+                        state.features[feature.key] = null;
                     });
 
                     // Extract fresh data from page
                     const extracted = window.extractCarData?.();
-                    console.log('[NotesEditor] Extracted fresh data:', extracted);
 
                     if (extracted) {
                         // Parse metadata
                         if (window.MetadataParser) {
                             const parsedMetadata = window.MetadataParser.extractMetadata(extracted);
-                            console.log('[NotesEditor] Parsed metadata:', parsedMetadata);
                             state.make = parsedMetadata.make || '';
                             state.model = parsedMetadata.model || '';
                             state.price = parsedMetadata.price || '';
@@ -570,85 +456,45 @@ window.NotesEditor = {
                             state.year = parsedMetadata.year || '';
                         }
 
-                        // Parse features
-                        if (extracted.features && Array.isArray(extracted.features)) {
-                            console.log('[NotesEditor] Parsing', extracted.features.length, 'extracted features');
-                            const featureAliases = {
-                                'camera': ['Камера', 'камера', 'camera', 'Camera'],
-                                'feature_acc': ['ACC', 'acc', 'Adaptive Cruise Control'],
-                                'feature_android_auto_carplay': ['Android Auto', 'CarPlay', 'Android', 'Apple CarPlay'],
-                                'feature_parking_sensors': ['Парктроніки', 'парктроніки', 'Parking sensors', 'Parking'],
-                                'feature_blind_spot': ['Blind spot', 'blind spot monitor', 'BSM'],
-                                'feature_lane_assist': ['Lane assist', 'lane keeping', 'Lane keeping assist'],
-                                'feature_signs': ['Знаки', 'знаки', 'sign recognition'],
-                                'feature_rear_traffic_alert': ['Rear traffic alert', 'traffic alert'],
-                                'feature_traffic_jam_assist': ['Traffic Jam Assist', 'traffic jam'],
-                                'feature_keyless': ['Keyless', 'keyless entry', 'Безключевой доступ'],
-                                'feature_digital_cockpit': ['Digital cockpit', 'Virtual cockpit', 'cockpit'],
-                                'feature_heated_seats': ['Підігрів сидінь', 'підігрів сидінь', 'heated seats', 'Heated seats'],
-                                'feature_heated_windshield': ['Підігрів лобового', 'heated windshield'],
-                                'feature_heated_steering_wheel': ['Підігрів керма', 'heated steering wheel'],
-                                'feature_massage_seats': ['Масаж', 'масаж', 'massage seats'],
-                                'feature_memory_seats': ['Пам\'ять сидінь', 'memory seats'],
-                                'feature_dcc': ['DCC', 'Dynamic Chassis Control'],
-                                'feature_webasto': ['Webasto', 'webasto'],
-                                'feature_matrix_headlights': ['Matrix', 'Matrix lights', 'matrix headlights'],
-                                'feature_auto_parking': ['Автопаркування', 'auto parking', 'automatic parking'],
-                                'feature_360_camera': ['360 камера', '360 camera', '360°'],
-                                'feature_tow_hitch': ['Фаркоп', 'фаркоп', 'Tow hitch', 'tow hook'],
-                                'feature_electric_tailgate': ['Електробагажник', 'electric tailgate'],
-                                'feature_auto_tailgate': ['Автобагажник', 'auto tailgate'],
-                                'feature_panoramic_roof': ['Панорама', 'panoramic roof', 'panorama'],
-                                'feature_hud': ['HUD', 'Head-up display']
-                            };
+                        // Parse features using the same logic as normal extraction
+                        // Search through ENTIRE extracted data (as JSON string), not just features array
+                        if (extracted && window.FeaturesParser?.FEATURE_KEYWORDS) {
+                            const fullContent = JSON.stringify(extracted).toLowerCase();
+                            const keywords = window.FeaturesParser.FEATURE_KEYWORDS;
 
-                            extracted.features.forEach(extractedName => {
-                                const lowerExtracted = extractedName.toLowerCase();
-                                let matched = false;
-
-                                for (const [featureKey, aliases] of Object.entries(featureAliases)) {
-                                    for (const alias of aliases) {
-                                        if (lowerExtracted === alias.toLowerCase() ||
-                                            lowerExtracted.includes(alias.toLowerCase()) ||
-                                            alias.toLowerCase().includes(lowerExtracted)) {
-                                            const matchingConfigFeature = configList.find(f =>
-                                                f.label.toLowerCase() === alias.toLowerCase() ||
-                                                f.key === featureKey
-                                            );
-                                            if (matchingConfigFeature) {
-                                                state.features[matchingConfigFeature.key] = true;
-                                                console.log('[NotesEditor] ✅ Matched', extractedName, '→', matchingConfigFeature.label);
-                                                matched = true;
-                                                break;
-                                            }
+                            // Check each feature keyword across all extracted data
+                            for (const [featureName, keywordList] of Object.entries(keywords)) {
+                                for (const keyword of keywordList) {
+                                    if (fullContent.includes(keyword.toLowerCase())) {
+                                        // Find the corresponding database key from fullFeaturesListCache
+                                        const configFeature = configList.find(f =>
+                                            f.label === featureName ||
+                                            f.label.toLowerCase() === featureName.toLowerCase()
+                                        );
+                                        if (configFeature) {
+                                            state.features[configFeature.key] = true;
                                         }
+                                        break; // Feature found, move to next feature
                                     }
-                                    if (matched) break;
                                 }
-
-                                if (!matched) {
-                                    console.log('[NotesEditor] ⚠️ Could not match extracted feature:', extractedName);
-                                }
-                            });
+                            }
                         }
                     }
 
                     // Save all metadata to database
-                    console.log('[NotesEditor] Saving all metadata to database...');
                     const metadataFields = ['make', 'model', 'price', 'price_eur', 'mileage', 'year', 'seat_type', 'climate', 'owners', 'tow_hitch_type'];
                     const savePromises = metadataFields.map(field =>
                         window.NoteCallbacks.updateMetadataField(state.carId, field, state[field])
-                            .then(() => console.log('[NotesEditor] ✅ Saved', field))
-                            .catch(err => console.error('[NotesEditor] ❌ Error saving', field, ':', err))
+                            .catch(err => console.error('[NotesEditor] Error saving', field, ':', err))
                     );
 
-                    // Save features to database
-                    console.log('[NotesEditor] Saving all features to database...');
-                    savePromises.push(
-                        window.NoteCallbacks.updateNote(state.carId, { features: state.features })
-                            .then(() => console.log('[NotesEditor] ✅ Saved features'))
-                            .catch(err => console.error('[NotesEditor] ❌ Error saving features:', err))
-                    );
+                    // Save all features to database
+                    Object.entries(state.features).forEach(([featureKey, featureState]) => {
+                        savePromises.push(
+                            window.NoteCallbacks.updateFeature(state.carId, featureKey, featureState)
+                                .catch(err => console.error('[NotesEditor] Error saving feature', featureKey, ':', err))
+                        );
+                    });
 
                     // Wait for all saves
                     await Promise.all(savePromises);
@@ -675,40 +521,26 @@ window.NotesEditor = {
                         }
                     ));
 
-                    console.log('[NotesEditor] ✅ Clear & Re-parse All completed successfully');
                     window.NotesEditor.showSaveNotification('Data cleared and re-parsed from page!', 'success', 3000);
                 } catch (error) {
-                    console.error('[NotesEditor] Error during Clear & Re-parse All:', error);
+                    console.error('[NotesEditor] Error during refresh:', error);
                     window.NotesEditor.showSaveNotification('Error clearing and re-parsing data', 'error', 3000);
                 }
             };
             featuresLabel.appendChild(clearReparseBtn);
-        } else if (displayMode === 'modal') {
-            // Disabled reparse in modal (no article data available)
-            const reparseBtn = document.createElement('button');
-            reparseBtn.textContent = '↻ Re-parse (N/A in list)';
-            reparseBtn.disabled = true;
-            reparseBtn.style.cssText = `
-                margin-left: 8px;
-                padding: 4px 8px;
-                background: #ccc;
-                color: #666;
-                border: none;
-                border-radius: 3px;
-                cursor: not-allowed;
-                font-size: 11px;
-            `;
-            featuresLabel.appendChild(reparseBtn);
         }
 
         featuresSection.appendChild(window.UIComponents.createFeaturesGrid(
             window.UIComponents.getFeaturesList(),
             state.features,
             async (featureKey) => {
+                console.log('[NotesEditor] Feature button clicked:', featureKey);
                 const nextState = window.NoteCallbacks.toggleFeatureState(state.features[featureKey]);
+                console.log('[NotesEditor] Next state:', nextState, 'for carId:', state.carId);
                 state.features[featureKey] = nextState;
                 // Save ONLY this single feature to database (independent operation)
-                await window.NoteCallbacks.updateFeature(state.carId, featureKey, nextState);
+                const result = await window.NoteCallbacks.updateFeature(state.carId, featureKey, nextState);
+                console.log('[NotesEditor] updateFeature returned:', result);
                 // Refresh the grid to show the new state
                 updateFeaturesGrid();
             }

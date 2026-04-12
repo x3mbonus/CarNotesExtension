@@ -135,37 +135,37 @@ END $$;
 -- ========================================
 -- Populate features_config table with standard features
 INSERT INTO public.features_config (key, label, priority, sort) VALUES
-    -- High Priority Features (Priority 2)
+    -- High Priority Features (Priority 2) - shown in RED when not present
     ('feature_acc', 'ACC', 2, 1),
-    ('feature_parking_sensors', 'Парктроніки', 2, 2),
-    ('feature_blind_spot', 'Blind Spot', 2, 3),
-    ('feature_lane_assist', 'Lane Assist', 2, 4),
-    ('feature_auto_parking', 'Auto Parking', 2, 5),
+    ('feature_android_auto_carplay', 'Android Auto / CarPlay', 2, 2),
+    ('feature_camera', 'Камера', 2, 3),
+    ('feature_parking_sensors', 'Парктроніки', 2, 4),
+    ('feature_blind_spot', 'Blind Spot', 2, 5),
+    ('feature_tow_hitch', 'Фаркоп', 2, 6),
 
-    -- Medium Priority Features (Priority 1)
-    ('feature_android_auto_carplay', 'Android Auto/CarPlay', 1, 10),
-    ('feature_heated_seats', 'Heated Seats', 1, 11),
-    ('feature_heated_windshield', 'Heated Windshield', 1, 12),
-    ('feature_heated_steering_wheel', 'Heated Steering Wheel', 1, 13),
-    ('camera', 'Camera', 1, 14),
-    ('feature_360_camera', '360 Camera', 1, 15),
+    -- Medium Priority Features (Priority 1) - shown in YELLOW/ORANGE when not present
+    ('feature_lane_assist', 'Lane Assist', 1, 10),
+    ('feature_signs', 'Знаки', 1, 11),
+    ('feature_keyless', 'Keyless', 1, 12),
+    ('feature_digital_cockpit', 'Digital Cockpit', 1, 13),
+    ('feature_heated_seats', 'Підігрів сидінь', 1, 14),
+    ('feature_massage_seats', 'Масаж', 1, 15),
+    ('feature_matrix_headlights', 'Matrix', 1, 16),
+    ('feature_electric_tailgate', 'Електробагажник', 1, 17),
 
-    -- Low Priority Features (Priority 0)
-    ('feature_signs', 'Sign Recognition', 0, 20),
-    ('feature_rear_traffic_alert', 'Rear Traffic Alert', 0, 21),
-    ('feature_traffic_jam_assist', 'Traffic Jam Assist', 0, 22),
-    ('feature_keyless', 'Keyless', 0, 23),
-    ('feature_digital_cockpit', 'Digital Cockpit', 0, 24),
-    ('feature_massage_seats', 'Massage Seats', 0, 25),
-    ('feature_memory_seats', 'Memory Seats', 0, 26),
-    ('feature_dcc', 'DCC', 0, 27),
-    ('feature_webasto', 'Webasto', 0, 28),
-    ('feature_matrix_headlights', 'Matrix Headlights', 0, 29),
-    ('feature_panoramic_roof', 'Panoramic Roof', 0, 30),
-    ('feature_electric_tailgate', 'Electric Tailgate', 0, 31),
-    ('feature_auto_tailgate', 'Auto Tailgate', 0, 32),
-    ('feature_tow_hitch', 'Tow Hitch', 0, 33),
-    ('feature_hud', 'HUD', 0, 34)
+    -- Low Priority Features (Priority 0) - shown in WHITE when not present
+    ('feature_rear_traffic_alert', 'Rear Traffic Alert', 0, 20),
+    ('feature_traffic_jam_assist', 'Traffic Jam Assist', 0, 21),
+    ('feature_heated_windshield', 'Підігрів лобового', 0, 22),
+    ('feature_heated_steering_wheel', 'Підігрів керма', 0, 23),
+    ('feature_memory_seats', 'Пам\'ять сидінь', 0, 24),
+    ('feature_dcc', 'DCC', 0, 25),
+    ('feature_webasto', 'Webasto', 0, 26),
+    ('feature_auto_parking', 'Автопаркування', 0, 27),
+    ('feature_360_camera', '360 Камера', 0, 28),
+    ('feature_auto_tailgate', 'Автобагажник', 0, 29),
+    ('feature_panoramic_roof', 'Панорама', 0, 30),
+    ('feature_hud', 'HUD', 0, 31)
 ON CONFLICT (key) DO NOTHING;
 
 -- ========================================
