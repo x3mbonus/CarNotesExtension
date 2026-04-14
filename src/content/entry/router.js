@@ -24,7 +24,7 @@ window.SiteRouter = {
      */
     isDetailPage(hostname, pathname, search) {
         if (hostname.includes('mobile.de')) {
-            // Mobile.de: 
+            // Mobile.de:
             // - Old format: /fahrzeuge/details.html?id=123
             // - Old format: /details.html?id=123
             // - New format: /auto-inserat/.../{id}.html
