@@ -2,16 +2,26 @@
 
 window.MobileDeAdapter = {
     /**
-     * Extract car ID from mobile.de article element
+     * Extract car ID from article element
      */
     extractId(article) {
-        // Find the main link in the article
+        // Try new format: /auto-inserat/.../{id}.html
+        const newFormatLink = article.querySelector('a[href*="/auto-inserat/"][href*=".html"]');
+        if (newFormatLink && newFormatLink.href) {
+            const match = newFormatLink.href.match(/\/auto-inserat\/[^/]+\/(\d+)\.html/);
+            if (match && match[1]) {
+                console.log('[CAR-NOTES] Found mobile.de ID from new format:', match[1]);
+                return match[1];
+            }
+        }
+
+        // Try old format: details.html?id={id}
         const link = article.querySelector('a[href*="details.html"]');
         if (link && link.href) {
             // Extract ID from URL parameter: ?id=451756414
             const match = link.href.match(/[?&]id=(\d+)/);
             if (match && match[1]) {
-                console.log('[CarNotes] Found mobile.de ID from details.html:', match[1]);
+                console.log('[CAR-NOTES] Found mobile.de ID from details.html:', match[1]);
                 return match[1];
             }
         }
@@ -21,21 +31,34 @@ window.MobileDeAdapter = {
         if (anyLink) {
             const match = anyLink.href.match(/id=(\d+)/);
             if (match && match[1]) {
-                console.log('[CarNotes] Found mobile.de ID from fallback:', match[1]);
+                console.log('[CAR-NOTES] Found mobile.de ID from fallback:', match[1]);
                 return match[1];
             }
         }
 
-        console.log('[CarNotes] No mobile.de ID found for article');
+        console.log('[CAR-NOTES] No mobile.de ID found for article');
         return null;
     },
 
     /**
-     * Extract car ID from detail page URL
+     * Extract car ID from detail page URL (supports both old and new formats)
      */
-    extractDetailId(search) {
-        const match = search.match(/[?&]id=(\d+)/);
-        return match ? match[1] : null;
+    extractDetailId(pathname, search) {
+        // Try new format: /auto-inserat/.../{id}.html
+        const newMatch = pathname.match(/\/auto-inserat\/[^/]+\/(\d+)\.html/);
+        if (newMatch && newMatch[1]) {
+            console.log('[CAR-NOTES] Found detail ID from new pathname format:', newMatch[1]);
+            return newMatch[1];
+        }
+
+        // Try old format: search params ?id={id}
+        const oldMatch = search.match(/[?&]id=(\d+)/);
+        if (oldMatch && oldMatch[1]) {
+            console.log('[CAR-NOTES] Found detail ID from query params:', oldMatch[1]);
+            return oldMatch[1];
+        }
+
+        return null;
     },
 
     /**
@@ -65,8 +88,9 @@ window.MobileDeAdapter = {
      * Handle mobile.de detail page
      */
     async handleDetailPage(pathname, search) {
-        const carId = this.extractDetailId(search);
+        const carId = this.extractDetailId(pathname, search);
         if (carId && window.CarDetailPanel) {
+            console.log('[CAR-NOTES] Mobile.de detail page detected, car ID:', carId);
             window.CarDetailPanel.showPanel(carId);
         }
     }

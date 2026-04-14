@@ -44,10 +44,12 @@ async function getNote(carId) {
             price_eur: data.price_eur || '',
             mileage: data.mileage || '',
             year: data.year || '',
+            address: data.address || '',
             seat_type: data.seat_type || '',
             climate: data.climate || '',
             owners: data.owners || '',
-            tow_hitch_type: data.tow_hitch_type || ''
+            tow_hitch_type: data.tow_hitch_type || '',
+            url: data.url || ''
         };
     }
     return null;
@@ -73,10 +75,12 @@ async function saveNote(carId, noteData) {
             price_eur: noteData.price_eur,
             mileage: noteData.mileage,
             year: noteData.year,
+            address: noteData.address,
             seat_type: noteData.seat_type,
             climate: noteData.climate,
             owners: noteData.owners,
-            tow_hitch_type: noteData.tow_hitch_type
+            tow_hitch_type: noteData.tow_hitch_type,
+            url: noteData.url
         }
     );
 

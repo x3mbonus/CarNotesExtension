@@ -27,17 +27,26 @@ window.CarDetailPanel = {
      * Show unified panel with all car data
      */
     async showPanel(carId, data) {
-        console.log('🔍 CarDetailPanel.showPanel called with carId:', carId);
+        console.log('[CAR-NOTES] showPanel called with carId:', carId);
 
         // Prevent duplicate initialization of same car
         if (this.currentCarId === carId && this.panelElement) {
-            console.log('⊙ Panel already shown for this car, skipping duplicate initialization');
+            console.log('[CAR-NOTES] Panel already shown for this car, skipping duplicate initialization');
+            // Make sure wrapper is visible
+            if (this.wrapperElement) {
+                this.wrapperElement.style.display = '';
+            }
             return;
+        }
+
+        // Make sure wrapper is visible when showing a new car
+        if (this.wrapperElement) {
+            this.wrapperElement.style.display = '';
         }
 
         // Prevent concurrent initialization
         if (this.isInitializing) {
-            console.log('⏳ Panel initialization already in progress, skipping duplicate call');
+            console.log('[CAR-NOTES] Panel initialization already in progress, skipping duplicate call');
             return;
         }
 
@@ -47,24 +56,26 @@ window.CarDetailPanel = {
 
         if (!this.panelElement) {
             this.createPanel();
-            console.log('✅ Panel created');
+            console.log('[CAR-NOTES] Panel created');
         }
 
         // Load or initialize features
-        console.log('[CarDetailPanel] FeaturesManager exists?', !!window.FeaturesManager);
+        console.log('[CAR-NOTES] FeaturesManager exists?', !!window.FeaturesManager);
         try {
-            console.log('[CarDetailPanel] Calling initializeFeatures...');
+            console.log('[CAR-NOTES] Calling initializeFeatures...');
             const featureState = await window.FeaturesManager?.initializeFeatures?.(carId, data);
-            console.log('[CarDetailPanel] initializeFeatures returned:', featureState);
+            console.log('[CAR-NOTES] initializeFeatures returned:', featureState);
             this.currentFeatures = featureState?.features || {};
+            console.log('[CAR-NOTES] currentFeatures set to:', this.currentFeatures);
             this.isVerified = featureState?.confirmed || false;
             this.currentSort = featureState?.sort ?? null;  // null = no rating, not -1
 
             // If features were not loaded from DB, save them automatically on first visit
             if (!featureState?.isFromDb) {
-                console.log('[CarDetailPanel] Auto-saving features on first visit (source:', featureState?.featuresSource, ', count:', Object.keys(this.currentFeatures).length, ')');
+                console.log('[CAR-NOTES] Auto-saving features on first visit (source:', featureState?.featuresSource, ', count:', Object.keys(this.currentFeatures).length, ')');
+                console.log('[CAR-NOTES] Features to save:', this.currentFeatures);
                 await window.FeaturesManager?.confirmAllFeatures?.(carId, this.currentFeatures, this.currentSort, false);
-                console.log('[CarDetailPanel] Features auto-saved to DB');
+                console.log('[CAR-NOTES] Features auto-saved to DB');
             }
 
             console.log('✅ Features loaded:', Object.keys(this.currentFeatures).length, 'features');
@@ -74,14 +85,14 @@ window.CarDetailPanel = {
         }
 
         // Load note metadata (WITHOUT re-fetching features - we already have them from initializeFeatures)
-        console.log('[CarDetailPanel] Calling getCarDataMetadata via FeaturesManager...');
+        console.log('[CAR-NOTES] Calling getCarDataMetadata via FeaturesManager...');
         try {
             const noteDataPromise = window.FeaturesManager?.getCarDataMetdata?.(carId);
             const timeoutPromise = new Promise((resolve) =>
                 setTimeout(() => resolve(null), 2000) // 2 second timeout
             );
             const noteData = noteDataPromise ? await Promise.race([noteDataPromise, timeoutPromise]) : null;
-            console.log('[CarDetailPanel] getCarDataMetadata returned:', noteData);
+            console.log('[CAR-NOTES] getCarDataMetadata returned:', noteData);
             if (noteData) {
                 this.currentNote = noteData.text || '';
                 this.currentColor = noteData.color || '#e0e0e0';  // Default to gray (no rating) if not set
@@ -198,7 +209,7 @@ window.CarDetailPanel = {
         refreshBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[CarDetailPanel] Refreshing data from database...');
+            console.log('[CAR-NOTES] Refreshing data from database...');
             try {
                 // Reload all car data including features and confirmed status
                 const carData = await window.SupabaseApi?.getCarData?.(this.currentCarId);
@@ -212,14 +223,47 @@ window.CarDetailPanel = {
                     this.currentClimate = carData.climate || '';
                     this.currentOwners = carData.owners || '';
                     this.currentTowHitchType = carData.tow_hitch_type || '';
-                    console.log('[CarDetailPanel] Data refreshed: features=', Object.keys(this.currentFeatures).length, 'confirmed=', this.isVerified);
+                    console.log('[CAR-NOTES] Data refreshed: features=', Object.keys(this.currentFeatures).length, 'confirmed=', this.isVerified);
                     await this.updatePanelContent();
                 }
             } catch (error) {
-                console.error('[CarDetailPanel] Error refreshing data:', error);
+                console.error('[CAR-NOTES] Error refreshing data:', error);
             }
         });
         header.appendChild(refreshBtn);
+
+        // Compare button
+        const compareBtn = document.createElement('button');
+        compareBtn.id = 'unified-panel-compare';
+        compareBtn.textContent = '📊';
+        compareBtn.title = 'Compare with other cars';
+        compareBtn.style.cssText = `
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            pointer-events: auto;
+            position: relative;
+            z-index: 10001;
+        `;
+        compareBtn.onmouseover = () => compareBtn.style.background = 'rgba(255,255,255,0.3)';
+        compareBtn.onmouseout = () => compareBtn.style.background = 'rgba(255,255,255,0.2)';
+        compareBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[CAR-NOTES] Opening compare modal');
+            try {
+                // Pass current car ID and sort for smart filtering
+                await window.ComparePanel?.showCompareModal?.(this.currentSort, this.currentCarId);
+            } catch (error) {
+                console.error('[CAR-NOTES] Error opening compare modal:', error);
+            }
+        });
+        header.appendChild(compareBtn);
 
         // Collapse button
         const collapseBtn = document.createElement('button');
@@ -243,7 +287,7 @@ window.CarDetailPanel = {
         collapseBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[CarDetailPanel] Collapse button clicked');
+            console.log('[CAR-NOTES] Collapse button clicked');
             this.togglePanel();
         });
         header.appendChild(collapseBtn);
@@ -276,7 +320,7 @@ window.CarDetailPanel = {
         expandBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[CarDetailPanel] Expand button clicked');
+            console.log('[CAR-NOTES] Expand button clicked');
             this.togglePanel();
         });
         document.body.appendChild(expandBtn);
@@ -325,9 +369,9 @@ window.CarDetailPanel = {
      * Update panel content using unified NotesEditor
      */
     async updatePanelContent() {
-        console.log('[UnifiedPanel] updatePanelContent called, panelElement exists?', !!this.panelElement);
+        console.log('[CAR-NOTES] updatePanelContent called, panelElement exists?', !!this.panelElement);
         if (!this.panelElement) {
-            console.warn('[UnifiedPanel] ⚠️ panelElement is null/undefined, cannot update content');
+            console.warn('[CAR-NOTES] ⚠️ panelElement is null/undefined, cannot update content');
             return;
         }
 
@@ -357,7 +401,7 @@ window.CarDetailPanel = {
             // Get editor content container
             const editorContainer = document.getElementById('unified-panel-editor-content');
             if (!editorContainer) {
-                console.error('[UnifiedPanel] Editor container not found');
+                console.error('[CAR-NOTES] Editor container not found');
                 return;
             }
 
@@ -389,11 +433,11 @@ window.CarDetailPanel = {
     updateExportSection() {
         const section = document.getElementById('unified-export-section');
         if (!section) {
-            console.warn('[UnifiedPanel] Export section not found in DOM');
+            console.warn('[CAR-NOTES] Export section not found in DOM');
             return;
         }
 
-        console.log('[UnifiedPanel] Updating export section');
+        console.log('[CAR-NOTES] Updating export section');
         section.innerHTML = '';
 
         const label = document.createElement('div');
@@ -448,7 +492,7 @@ window.CarDetailPanel = {
         });
 
         section.appendChild(container);
-        console.log('[UnifiedPanel] Export section updated successfully');
+        console.log('[CAR-NOTES] Export section updated successfully');
     },
 
     /**
@@ -515,6 +559,48 @@ window.CarDetailPanel = {
         setTimeout(() => {
             notif.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notif.remove(), 300);
+        }, 2000);
+    },
+
+    /**
+     * Clear panel data (called when note is deleted)
+     */
+    clearPanel() {
+        console.log('[CAR-NOTES] clearPanel called for carId:', this.currentCarId);
+
+        // Set flag to prevent MutationObserver from reinitializing
+        // This flag will prevent route() from calling showPanel() while we're clearing
+        window._panelClearing = true;
+
+        // Reset all data
+        this.currentCarId = null;
+        this.currentFeatures = null;
+        this.isVerified = false;
+        this.currentSort = -1;
+        this.currentNote = '';
+        this.currentColor = '#e0e0e0';
+        this.currentMake = '';
+        this.currentModel = '';
+        this.currentPrice = '';
+        this.currentPriceEur = '';
+        this.currentMileage = '';
+        this.currentYear = '';
+        this.currentSeatType = '';
+        this.currentClimate = '';
+        this.currentOwners = '';
+        this.currentTowHitchType = '';
+
+        // Hide panel instead of clearing content - avoids triggering MutationObserver
+        const wrapper = this.wrapperElement;
+        if (wrapper) {
+            wrapper.style.display = 'none';
+        }
+
+        // Reset flag after 2 seconds (gives plenty of time for any pending operations)
+        // This allows the router to re-initialize only AFTER page refresh
+        setTimeout(() => {
+            window._panelClearing = false;
+            console.log('[CAR-NOTES] ✅ Panel cleared and reinit flag reset');
         }, 2000);
     },
 

@@ -24,8 +24,11 @@ window.SiteRouter = {
      */
     isDetailPage(hostname, pathname, search) {
         if (hostname.includes('mobile.de')) {
-            // Mobile.de: /fahrzeuge/details.html, /auto-inserat/, or language versions
-            return pathname.includes('/auto-inserat/') ||
+            // Mobile.de: 
+            // - Old format: /fahrzeuge/details.html?id=123
+            // - Old format: /details.html?id=123
+            // - New format: /auto-inserat/.../{id}.html
+            return pathname.includes('/auto-inserat/') && pathname.match(/\/\d+\.html/) ||
                    pathname.includes('/details.html') ||
                    (pathname.endsWith('.html') && search.includes('id=') && !pathname.includes('/search'));
         } else if (hostname.includes('otomoto.pl')) {
@@ -51,6 +54,12 @@ window.SiteRouter = {
      * Routes initialization based on page type
      */
     async route(hostname, pathname, search) {
+        // Skip if panel is currently being cleared
+        if (window._panelClearing) {
+            console.log('[CAR-NOTES] Skipping route - panel is clearing');
+            return;
+        }
+
         const platform = this.detectPlatform(hostname);
         const isDetail = this.isDetailPage(hostname, pathname, search);
         const adapter = this.getAdapter(platform);

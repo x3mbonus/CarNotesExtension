@@ -164,10 +164,10 @@ async function showNoteModal(carId, existingNote, article) {
         const featureState = await window.FeaturesManager?.initializeFeatures?.(carId, article ? { frameText: article } : null);
         if (featureState?.features) {
             features = featureState.features;
-            console.log('[Modal] Loaded', Object.keys(features).length, 'features from DB');
+            console.log('[CAR-NOTES] Loaded', Object.keys(features).length, 'features from DB');
         }
     } catch (error) {
-        console.warn('[Modal] Error loading features from DB:', error);
+        console.warn('[CAR-NOTES] Error loading features from DB:', error);
     }
 
     const state = {
@@ -355,9 +355,10 @@ async function showNoteModal(carId, existingNote, article) {
                 delete notesCache[carId];
                 document.querySelector(`[data-car-id="${carId}"].car-note-display`)?.remove();
                 document.querySelector(`[data-car-id="${carId}"].car-note-display-detail`)?.remove();
+                window.CarDetailPanel?.clearPanel?.();
 
                 closeModal();
-                initializeContentScript();
+                // Don't reinitialize - panel stays cleared until page refresh
             }
         });
     }

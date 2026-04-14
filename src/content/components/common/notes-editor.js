@@ -56,11 +56,11 @@ window.NotesEditor = {
     async create(config) {
         const { carId, existingNote, article, displayMode = 'modal', targetContainer, onClose } = config;
 
-        console.log(`[NotesEditor] Creating ${displayMode} for car:`, carId);
+        console.log(`[CAR-NOTES] Creating ${displayMode} for car:`, carId);
 
         // Initialize pending saves tracking for this editor instance
         const editorKey = `editor_${carId}_${Date.now()}`;
-        console.log('[NotesEditor] Generated editorKey:', editorKey);
+        console.log('[CAR-NOTES] Generated editorKey:', editorKey);
         this.pendingSaves[editorKey] = {
             textSave: null,
             colorSave: null,
@@ -94,7 +94,7 @@ window.NotesEditor = {
                 const extractedData = window.extractCarData?.();
                 if (extractedData && window.MetadataParser) {
                     const parsedMetadata = window.MetadataParser.extractMetadata(extractedData);
-                    console.log('[NotesEditor] Auto-populated metadata from extracted data:', parsedMetadata);
+                    console.log('[CAR-NOTES] Auto-populated metadata from extracted data:', parsedMetadata);
 
                     let autoSavePromises = [];
                     // Only fill in empty fields
@@ -106,7 +106,7 @@ window.NotesEditor = {
                     if (!state.year && parsedMetadata.year) { state.year = parsedMetadata.year; }
 
                     // Auto-save extracted metadata to database immediately
-                    console.log('[NotesEditor] Saving auto-extracted metadata...');
+                    console.log('[CAR-NOTES] Saving auto-extracted metadata...');
                     const autoSaveData = {
                         make: state.make,
                         model: state.model,
@@ -121,8 +121,8 @@ window.NotesEditor = {
                         if (fieldValue) {
                             autoSavePromises.push(
                                 window.NoteCallbacks.updateMetadataField(carId, fieldName, fieldValue)
-                                    .then(() => console.log('[NotesEditor] ✅ Auto-saved', fieldName, '=', fieldValue))
-                                    .catch(err => console.error('[NotesEditor] ❌ Error auto-saving', fieldName, ':', err))
+                                    .then(() => console.log('[CAR-NOTES] ✅ Auto-saved', fieldName, '=', fieldValue))
+                                    .catch(err => console.error('[CAR-NOTES] ❌ Error auto-saving', fieldName, ':', err))
                             );
                         }
                     }
@@ -131,38 +131,38 @@ window.NotesEditor = {
                     if (autoSavePromises.length > 0) {
                         Promise.all(autoSavePromises)
                             .then(() => {
-                                console.log('[NotesEditor] ✅ All auto-extracted metadata saved');
+                                console.log('[CAR-NOTES] ✅ All auto-extracted metadata saved');
                                 window.NotesEditor.showSaveNotification('Auto-extracted data saved', 'success', 2000);
                             })
                             .catch(err => {
-                                console.error('[NotesEditor] ❌ Error in auto-save:', err);
+                                console.error('[CAR-NOTES] ❌ Error in auto-save:', err);
                                 window.NotesEditor.showSaveNotification('Error auto-saving data', 'error', 3000);
                             });
                     }
                 }
             } catch (error) {
-                console.warn('[NotesEditor] Error auto-populating metadata:', error);
+                console.warn('[CAR-NOTES] Error auto-populating metadata:', error);
             }
         }
 
         // ✅ Skip re-fetching features if they're already in existingNote (avoid duplicate requests)
         const hasExistingFeatures = existingNote && Object.keys(existingNote.features || {}).length > 0;
-        console.log(`[NotesEditor] hasExistingFeatures=${hasExistingFeatures}, existingNote=${!!existingNote}, features.length=${Object.keys(existingNote?.features || {}).length}`);
+        console.log(`[CAR-NOTES] hasExistingFeatures=${hasExistingFeatures}, existingNote=${!!existingNote}, features.length=${Object.keys(existingNote?.features || {}).length}`);
 
         if (!hasExistingFeatures) {
             // Only call initializeFeatures if we don't have features already
             try {
-                console.log('[NotesEditor] Features not in existingNote, calling initializeFeatures...');
+                console.log('[CAR-NOTES] Features not in existingNote, calling initializeFeatures...');
                 const featureState = await window.FeaturesManager?.initializeFeatures?.(carId, article ? { frameText: article } : null);
                 if (featureState?.features) {
                     state.features = featureState.features;
-                    console.log(`[NotesEditor] Loaded ${Object.keys(state.features).length} features from DB`);
+                    console.log(`[CAR-NOTES] Loaded ${Object.keys(state.features).length} features from DB`);
                 }
             } catch (error) {
-                console.error('[NotesEditor] Error loading features:', error);
+                console.error('[CAR-NOTES] Error loading features:', error);
             }
         } else {
-            console.log(`[NotesEditor] Using existing features (${Object.keys(state.features).length} features)`);
+            console.log(`[CAR-NOTES] Using existing features (${Object.keys(state.features).length} features)`);
         }
 
         // ===== CREATE UI =====
@@ -203,7 +203,7 @@ window.NotesEditor = {
         } else {
             // Panel mode - use provided target container
             if (!targetContainer) {
-                console.error('[NotesEditor] Panel mode requires targetContainer');
+                console.error('[CAR-NOTES] Panel mode requires targetContainer');
                 return null;
             }
             targetContainer.innerHTML = '';  // Clear existing content
@@ -281,13 +281,13 @@ window.NotesEditor = {
                             });
                             // Track this save so it can be flushed if modal closes quickly
                             if (window.NotesEditor.pendingSaves[editorKey]) {
-                                console.log('[NotesEditor] Registering color save promise for editor:', editorKey);
+                                console.log('[CAR-NOTES] Registering color save promise for editor:', editorKey);
                                 window.NotesEditor.pendingSaves[editorKey].colorSave = savePromise;
                             }
                             await savePromise;
                             window.NotesEditor.showSaveNotification('Rating saved', 'success', 2000);
                         } catch (error) {
-                            console.error('[NotesEditor] Error saving rating:', error);
+                            console.error('[CAR-NOTES] Error saving rating:', error);
                             window.NotesEditor.showSaveNotification('Failed to save rating', 'error', 3000);
                         }
                     }, 800);
@@ -312,13 +312,13 @@ window.NotesEditor = {
                         const savePromise = window.NoteCallbacks.upsertNote(state.carId, { text: state.text, color: state.color });
                         // Track this save so it can be flushed if modal closes quickly
                         if (window.NotesEditor.pendingSaves[editorKey]) {
-                            console.log('[NotesEditor] Registering text save promise for editor:', editorKey);
+                            console.log('[CAR-NOTES] Registering text save promise for editor:', editorKey);
                             window.NotesEditor.pendingSaves[editorKey].textSave = savePromise;
                         }
                         await savePromise;
                         window.NotesEditor.showSaveNotification('Note saved', 'success', 2000);
                     } catch (error) {
-                        console.error('[NotesEditor] Error saving note:', error);
+                        console.error('[CAR-NOTES] Error saving note:', error);
                         window.NotesEditor.showSaveNotification('Failed to save note', 'error', 3000);
                     }
                 }, 800);
@@ -342,7 +342,7 @@ window.NotesEditor = {
             state.confirmed,
             async () => {
                 state.confirmed = !state.confirmed;
-                console.log('[NotesEditor] Toggling verified to:', state.confirmed);
+                console.log('[CAR-NOTES] Toggling verified to:', state.confirmed);
                 window.NotesEditor.showSaveNotification('Saving verification...', 'info', 3000);
                 try {
                     // Save ONLY the verified status to database (independent operation)
@@ -356,7 +356,7 @@ window.NotesEditor = {
                     }
                     window.NotesEditor.showSaveNotification('Verification saved', 'success', 2000);
                 } catch (error) {
-                    console.error('[NotesEditor] Error updating verified:', error);
+                    console.error('[CAR-NOTES] Error updating verified:', error);
                     window.NotesEditor.showSaveNotification('Failed to save verification', 'error', 3000);
                 }
             }
@@ -379,7 +379,7 @@ window.NotesEditor = {
                         // Show success for the first field updated
                         window.NotesEditor.showSaveNotification('Metadata saved', 'success', 2000);
                     } catch (error) {
-                        console.error('[NotesEditor] Error updating metadata:', error);
+                        console.error('[CAR-NOTES] Error updating metadata:', error);
                         window.NotesEditor.showSaveNotification('Failed to save metadata', 'error', 3000);
                     }
                 });
@@ -482,17 +482,17 @@ window.NotesEditor = {
                     }
 
                     // Save all metadata to database
-                    const metadataFields = ['make', 'model', 'price', 'price_eur', 'mileage', 'year', 'seat_type', 'climate', 'owners', 'tow_hitch_type'];
+                    const metadataFields = ['make', 'model', 'price', 'price_eur', 'mileage', 'year', 'address', 'seat_type', 'climate', 'owners', 'tow_hitch_type', 'url'];
                     const savePromises = metadataFields.map(field =>
                         window.NoteCallbacks.updateMetadataField(state.carId, field, state[field])
-                            .catch(err => console.error('[NotesEditor] Error saving', field, ':', err))
+                            .catch(err => console.error('[CAR-NOTES] Error saving', field, ':', err))
                     );
 
                     // Save all features to database
                     Object.entries(state.features).forEach(([featureKey, featureState]) => {
                         savePromises.push(
                             window.NoteCallbacks.updateFeature(state.carId, featureKey, featureState)
-                                .catch(err => console.error('[NotesEditor] Error saving feature', featureKey, ':', err))
+                                .catch(err => console.error('[CAR-NOTES] Error saving feature', featureKey, ':', err))
                         );
                     });
 
@@ -514,7 +514,7 @@ window.NotesEditor = {
                                     await window.NoteCallbacks.updateMetadataField(state.carId, fieldName, fieldValue);
                                     window.NotesEditor.showSaveNotification('Metadata saved', 'success', 2000);
                                 } catch (error) {
-                                    console.error('[NotesEditor] Error updating metadata:', error);
+                                    console.error('[CAR-NOTES] Error updating metadata:', error);
                                     window.NotesEditor.showSaveNotification('Failed to save metadata', 'error', 3000);
                                 }
                             });
@@ -523,7 +523,7 @@ window.NotesEditor = {
 
                     window.NotesEditor.showSaveNotification('Data cleared and re-parsed from page!', 'success', 3000);
                 } catch (error) {
-                    console.error('[NotesEditor] Error during refresh:', error);
+                    console.error('[CAR-NOTES] Error during refresh:', error);
                     window.NotesEditor.showSaveNotification('Error clearing and re-parsing data', 'error', 3000);
                 }
             };
@@ -534,13 +534,13 @@ window.NotesEditor = {
             window.UIComponents.getFeaturesList(),
             state.features,
             async (featureKey) => {
-                console.log('[NotesEditor] Feature button clicked:', featureKey);
+                console.log('[CAR-NOTES] Feature button clicked:', featureKey);
                 const nextState = window.NoteCallbacks.toggleFeatureState(state.features[featureKey]);
-                console.log('[NotesEditor] Next state:', nextState, 'for carId:', state.carId);
+                console.log('[CAR-NOTES] Next state:', nextState, 'for carId:', state.carId);
                 state.features[featureKey] = nextState;
                 // Save ONLY this single feature to database (independent operation)
                 const result = await window.NoteCallbacks.updateFeature(state.carId, featureKey, nextState);
-                console.log('[NotesEditor] updateFeature returned:', result);
+                console.log('[CAR-NOTES] updateFeature returned:', result);
                 // Refresh the grid to show the new state
                 updateFeaturesGrid();
             }
@@ -561,11 +561,9 @@ window.NotesEditor = {
             e.stopPropagation();
             if (confirm('Delete this note?')) {
                 await window.NoteCallbacks.deleteCarData(state.carId);
+                window.CarDetailPanel?.clearPanel?.();
                 this.close(displayMode);
-                // Trigger refresh callback after deletion
-                if (typeof onClose === 'function') {
-                    await onClose();
-                }
+                // Don't call onClose after deletion - panel should stay cleared until page refresh
             }
         };
         deleteSection.appendChild(deleteBtn);
@@ -628,9 +626,9 @@ window.NotesEditor = {
         if (displayMode === 'modal') {
             const backdrop = container;
             backdrop.addEventListener('click', async (e) => {
-                console.log('[NotesEditor] Backdrop click detected, e.target===backdrop?', e.target === backdrop);
+                console.log('[CAR-NOTES] Backdrop click detected, e.target===backdrop?', e.target === backdrop);
                 if (e.target === backdrop) {
-                    console.log('[NotesEditor] Backdrop click confirmed - closing with flush');
+                    console.log('[CAR-NOTES] Backdrop click confirmed - closing with flush');
                     await this.close(displayMode, editorKey);
                     onClose?.();
                 }
@@ -657,12 +655,12 @@ window.NotesEditor = {
         const promises = [];
 
         if (pending.textSave) {
-            console.log('[NotesEditor] Flushing pending text save...');
+            console.log('[CAR-NOTES] Flushing pending text save...');
             promises.push(Promise.resolve(pending.textSave));
         }
 
         if (pending.colorSave) {
-            console.log('[NotesEditor] Flushing pending color save...');
+            console.log('[CAR-NOTES] Flushing pending color save...');
             promises.push(Promise.resolve(pending.colorSave));
         }
 
@@ -670,14 +668,14 @@ window.NotesEditor = {
             try {
                 this.showSaveNotification('Saving pending changes...', 'info', 3000);
                 await Promise.all(promises);
-                console.log('[NotesEditor] ✅ All pending saves flushed before close');
+                console.log('[CAR-NOTES] ✅ All pending saves flushed before close');
                 this.showSaveNotification('All changes saved', 'success', 2000);
             } catch (error) {
-                console.error('[NotesEditor] Error flushing saves:', error);
+                console.error('[CAR-NOTES] Error flushing saves:', error);
                 this.showSaveNotification('Error saving changes', 'error', 3000);
             }
         } else {
-            console.log('[NotesEditor] No promises to flush');
+            console.log('[CAR-NOTES] No promises to flush');
         }
 
         // Clean up
@@ -695,7 +693,7 @@ window.NotesEditor = {
             const flushPromise = this.flushPendingSaves(editorKey);
             const timeoutPromise = new Promise((resolve) =>
                 setTimeout(() => {
-                    console.warn('[NotesEditor] Save flush timeout - closing anyway');
+                    console.warn('[CAR-NOTES] Save flush timeout - closing anyway');
                     resolve();
                 }, 2000)
             );

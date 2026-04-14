@@ -17,7 +17,7 @@ window.MetadataParser = {
 
     /**
      * Extract metadata from parsed car data
-     * Returns object with make, model, price, price_eur, mileage, year
+     * Returns object with make, model, price, price_eur, mileage, year, address, url
      */
     extractMetadata(extractedData) {
         const metadata = {
@@ -26,10 +26,31 @@ window.MetadataParser = {
             price: null,
             price_eur: null,
             mileage: null,
-            year: null
+            year: null,
+            address: null,
+            url: null
         };
 
         if (!extractedData) return metadata;
+
+        // Extract URL
+        if (extractedData.url) {
+            metadata.url = extractedData.url;
+        }
+
+        // Extract address from dealer info (mobile.de, otomoto.pl, etc.)
+        if (extractedData.dealer) {
+            const addressParts = [];
+            if (extractedData.dealer.address1) {
+                addressParts.push(extractedData.dealer.address1);
+            }
+            if (extractedData.dealer.address2) {
+                addressParts.push(extractedData.dealer.address2);
+            }
+            if (addressParts.length > 0) {
+                metadata.address = addressParts.join(', ');
+            }
+        }
 
         // Extract make and model from basics
         if (extractedData.basics?.make) {

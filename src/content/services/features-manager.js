@@ -163,32 +163,29 @@ window.FeaturesManager = {
     /**
      * Initialize features for a car listing
      * Load from DB or parse from content
+     * NOTE: Always checks DB first - don't cache parsed features per-car as rules may change
      */
     async initializeFeatures(carId, data) {
-        // CHECK CACHE FIRST - Return cached features for this carId
-        if (this.carFeaturesCache[carId]) {
-            console.log('[FeaturesManager] ✅ CACHE HIT: Returning cached features for car:', carId);
-            return this.carFeaturesCache[carId];
-        }
+        console.log('[CAR-NOTES] initializeFeatures called for carId:', carId);
 
         // If data not provided, extract it from the page
         if (!data) {
             data = window.extractCarData?.();
-            console.log('[FeaturesManager] Data not provided, extracted from page:', !!data);
+            console.log('[CAR-NOTES] Data not provided, extracted from page:', !!data);
         }
 
         // Try to load from database first
         let dbFeatures = null;
         try {
             dbFeatures = await window.SupabaseApi.getCarFeatures(carId);
-            console.log('[FeaturesManager] Loaded from DB:', Object.keys(dbFeatures || {}).length, 'features');
+            console.log('[CAR-NOTES] Loaded from DB:', Object.keys(dbFeatures || {}).length, 'features');
         } catch (error) {
-            console.warn('[FeaturesManager] Error fetching from DB:', error);
+            console.warn('[CAR-NOTES] Error fetching from DB:', error);
         }
 
         // If we got data from DB, return it (it's already in the right format: { key: state })
         if (dbFeatures && Object.keys(dbFeatures).length > 0) {
-            console.log('[FeaturesManager] Using DB features');
+            console.log('[CAR-NOTES] Using DB features');
             // Get car metadata WITHOUT re-fetching features (uses cache to prevent duplicates)
             const carData = await this.getCarDataMetdata(carId);
             const result = {
@@ -198,9 +195,7 @@ window.FeaturesManager = {
                 isFromDb: true,
                 featuresSource: carData?.featuresSource || 'manual'
             };
-            // CACHE THE RESULT
-            this.carFeaturesCache[carId] = result;
-            console.log('[FeaturesManager] 💾 CACHED features for car:', carId);
+            console.log('[CAR-NOTES] Returning DB result:', result);
             return result;
         }
 
@@ -215,7 +210,6 @@ window.FeaturesManager = {
                 isFromDb: false,
                 featuresSource: null
             };
-            this.carFeaturesCache[carId] = result;
             return result;
         }
 
@@ -228,6 +222,7 @@ window.FeaturesManager = {
 
         // Parse features
         const parsed = window.FeaturesParser.parseFeatures(data);
+        console.log('[CAR-NOTES] Parsed features raw:', parsed);
         const features = {};
 
         // Convert feature names to keys
@@ -237,11 +232,14 @@ window.FeaturesManager = {
             if (!key) {
                 key = window.FeatureColumnMapper ?
                     window.FeatureColumnMapper.featureToColumnName(featureName) :
-                    'feature_' + featureName.toLowerCase().replace(/\s+/g, '_');
+                    'feature_' + featureName.toLowerCase().replace(/[^\w]/g, '_').replace(/_+/g, '_');
             }
-            features[key] = isPresent ? true : null; // null = unknown
+            const state = isPresent ? true : null; // null = unknown
+            console.log(`[CAR-NOTES] "${featureName}" (${isPresent}) → "${key}" = ${state}`);
+            features[key] = state;
         });
 
+        console.log('[CAR-NOTES] Final features object:', features);
         const result = {
             features,
             confirmed: false,
@@ -249,9 +247,7 @@ window.FeaturesManager = {
             isFromDb: false,
             featuresSource: 'parsed'
         };
-        // CACHE THE RESULT
-        this.carFeaturesCache[carId] = result;
-        console.log('[FeaturesManager] 💾 CACHED parsed features for car:', carId);
+        console.log('[CAR-NOTES] Returning parsed result:', result);
         return result;
     },
 
