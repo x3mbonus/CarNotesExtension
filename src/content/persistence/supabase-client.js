@@ -164,6 +164,7 @@ window.SupabaseApi = {
                     features: features,
                     sort: row.sort,
                     confirmed: row.confirmed || false,
+                    sold: row.sold || false,
                     featuresSource: row.features_source || null,
                     make: row.make || null,
                     model: row.model || null,
@@ -176,7 +177,8 @@ window.SupabaseApi = {
                     seat_type: row.seat_type || null,
                     climate: row.climate || null,
                     owners: row.owners || null,
-                    tow_hitch_type: row.tow_hitch_type || null
+                    tow_hitch_type: row.tow_hitch_type || null,
+                    url: row.url || null
                 };
             }
 
@@ -226,6 +228,7 @@ window.SupabaseApi = {
                     updatedAt: row.updated_at,
                     sort: row.sort,
                     confirmed: row.confirmed || false,
+                    sold: row.sold || false,
                     featuresSource: row.features_source || null,
                     make: row.make || null,
                     model: row.model || null,
@@ -238,7 +241,8 @@ window.SupabaseApi = {
                     seat_type: row.seat_type || null,
                     climate: row.climate || null,
                     owners: row.owners || null,
-                    tow_hitch_type: row.tow_hitch_type || null
+                    tow_hitch_type: row.tow_hitch_type || null,
+                    url: row.url || null
                 };
             }
 
@@ -288,6 +292,7 @@ window.SupabaseApi = {
                         features: features,
                         sort: row.sort,
                         confirmed: row.confirmed || false,
+                        sold: row.sold || false,
                         featuresSource: row.features_source || null,
                         make: row.make || null,
                         model: row.model || null,
@@ -300,7 +305,8 @@ window.SupabaseApi = {
                         seat_type: row.seat_type || null,
                         climate: row.climate || null,
                         owners: row.owners || null,
-                        tow_hitch_type: row.tow_hitch_type || null
+                        tow_hitch_type: row.tow_hitch_type || null,
+                        url: row.url || null
                     };
                 }
             }
@@ -347,6 +353,7 @@ window.SupabaseApi = {
                 ...(metadata.owners && { owners: metadata.owners }),
                 ...(metadata.tow_hitch_type && { tow_hitch_type: metadata.tow_hitch_type }),
                 ...(metadata.url && { url: metadata.url }),
+                ...(metadata.sold !== undefined && { sold: metadata.sold }),
                 updated_at: now
             };
 
@@ -399,6 +406,7 @@ window.SupabaseApi = {
                 owners: metadata.owners || null,
                 tow_hitch_type: metadata.tow_hitch_type || null,
                 url: metadata.url || null,
+                sold: metadata.sold || false,
                 created_at: now,
                 updated_at: now
             };
@@ -654,6 +662,36 @@ window.SupabaseApi = {
             }
 
             console.log('[CAR-NOTES] ✅ Updated');
+            return { success: true };
+        } catch (error) {
+            console.error('[CAR-NOTES] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Update sold status (independent operation)
+    async updateSold(carId, sold) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+
+        try {
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = { sold: sold, updated_at: new Date().toISOString() };
+
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: { 'apikey': window.SupabaseClient.key, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.warn('[CAR-NOTES] updateSold failed:', response.status, errorText);
+                return { success: false, error: errorText };
+            }
+
+            console.log('[CAR-NOTES] ✅ Sold updated to', sold);
             return { success: true };
         } catch (error) {
             console.error('[CAR-NOTES] Error:', error);

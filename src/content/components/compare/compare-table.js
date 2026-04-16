@@ -4,6 +4,7 @@
  */
 
 window.CompareTable = {
+    _ogImageCache: {}, // url → imageUrl (or null)
     /**
      * Create a comparison table for multiple cars
      * @param {Array} carList - Array of car objects with carId, metadata, features, and sort
@@ -46,10 +47,7 @@ window.CompareTable = {
             const make = car.metadata?.make || 'Unknown';
             const model = car.metadata?.model || '';
             const isCurrent = car.isCurrentCar ? ' (← Current)' : '';
-            cell.innerHTML = `
-                <div style="font-weight: bold;">${make}${isCurrent}</div>
-                <div style="font-size: 11px; color: #666;">${model}</div>
-            `;
+
             cell.style.cssText = `
                 padding: 8px;
                 border: ${car.isCurrentCar ? '3px solid #667eea' : '1px solid #ddd'};
@@ -59,16 +57,52 @@ window.CompareTable = {
                 background: ${this._getRatingColor(car.metadata?.sort)};
                 font-weight: ${car.isCurrentCar ? 'bold' : 'normal'};
             `;
+
+            // Photo placeholder — filled asynchronously if URL present
+            const url = car.metadata?.url || '';
+            if (url) {
+                const img = document.createElement('img');
+                img.alt = `${make} ${model}`;
+                img.style.cssText = `
+                    width: 100%;
+                    height: 90px;
+                    object-fit: cover;
+                    border-radius: 4px;
+                    margin-bottom: 4px;
+                    display: block;
+                    background: #eee;
+                `;
+                cell.appendChild(img);
+
+                this._fetchOgImage(url).then(imageUrl => {
+                    if (imageUrl) img.src = imageUrl;
+                    else img.style.display = 'none';
+                });
+            }
+
+            const makeDiv = document.createElement('div');
+            makeDiv.style.fontWeight = 'bold';
+            makeDiv.textContent = make + isCurrent;
+            cell.appendChild(makeDiv);
+
+            const modelDiv = document.createElement('div');
+            modelDiv.style.cssText = 'font-size: 11px; color: #666;';
+            modelDiv.textContent = model;
+            cell.appendChild(modelDiv);
         });
 
         // Table body with specs and features
         const tbody = table.createTBody();
 
-        // Row: URL (first row)
+        // Row: Note (first row)
+        this._addNoteRow(tbody, carList);
+
+        // Row: URL
         this._addCompareRow(tbody, 'Лінк', carList, (car) => {
             const url = car.metadata?.url || car.url || '';
-            if (!url) return '—';
-            return `<a href="${url}" target="_blank" style="color: #667eea; text-decoration: underline; font-size: 11px;">View</a>`;
+            const id = car.carId || '—';
+            if (!url) return id;
+            return `<a href="${url}" target="_blank" style="color: #667eea; text-decoration: underline; font-size: 11px;">${id}</a>`;
         }, 0, true); // true = isHtml
 
         // Row: Rating
@@ -86,17 +120,28 @@ window.CompareTable = {
         }, 0, false);
 
         // Metadata rows (matching Excel order)
-        this._addCompareRow(tbody, 'Рік', carList, (car) => car.metadata?.year || '—', 0, false);
-        this._addCompareRow(tbody, 'Пробіг', carList, (car) => car.metadata?.mileage || '—', 0, false);
+        this._addCompareRow(tbody, 'Рік', carList,
+            (car) => car.metadata?.year || '—', 0, false,
+            (car) => window.UIComponents.getMetadataColor('year', car.metadata?.year));
+        this._addCompareRow(tbody, 'Пробіг', carList,
+            (car) => car.metadata?.mileage || '—', 0, false,
+            (car) => window.UIComponents.getMetadataColor('mileage', car.metadata?.mileage));
         this._addCompareRow(tbody, 'Ціна (EUR)', carList, (car) => {
             const eur = car.metadata?.price_eur || '—';
             const pln = car.metadata?.price || '—';
             const title = pln !== '—' ? `PLN: ${pln}` : '';
             return `<span title="${title}">${eur}</span>`;
-        }, 0, true); // Show EUR, PLN on hover
-        this._addCompareRow(tbody, 'Тип сидінь', carList, (car) => car.metadata?.seat_type || '—', 0, false);
-        this._addCompareRow(tbody, 'Власників', carList, (car) => car.metadata?.owners || '—', 0, false);
-        this._addCompareRow(tbody, 'Фаркоп тип', carList, (car) => car.metadata?.tow_hitch_type || '—', 0, false);
+        }, 0, true,
+            (car) => window.UIComponents.getMetadataColor('price_eur', car.metadata?.price_eur));
+        this._addCompareRow(tbody, 'Тип сидінь', carList,
+            (car) => car.metadata?.seat_type || '—', 0, false,
+            (car) => window.UIComponents.getMetadataColor('seat_type', car.metadata?.seat_type));
+        this._addCompareRow(tbody, 'Власників', carList,
+            (car) => car.metadata?.owners || '—', 0, false,
+            (car) => window.UIComponents.getMetadataColor('owners', car.metadata?.owners));
+        this._addCompareRow(tbody, 'Фаркоп тип', carList,
+            (car) => car.metadata?.tow_hitch_type || '—', 0, false,
+            (car) => window.UIComponents.getMetadataColor('tow_hitch_type', car.metadata?.tow_hitch_type));
 
         // Features section header
         const featuresHeaderRow = tbody.insertRow();
@@ -121,15 +166,55 @@ window.CompareTable = {
     },
 
     /**
+     * Add a note text row — each cell shows the car's note with its rating background color
+     */
+    _addNoteRow(tbody, carList) {
+        const row = tbody.insertRow();
+        row.style.cssText = 'border-bottom: 1px solid #ddd;';
+
+        const labelCell = row.insertCell();
+        labelCell.textContent = 'Нотатка';
+        labelCell.style.cssText = `
+            padding: 8px;
+            border: 1px solid #ddd;
+            font-weight: 500;
+            background: #fafafa;
+            min-width: 120px;
+            text-align: left;
+            vertical-align: top;
+        `;
+
+        carList.forEach(car => {
+            const cell = row.insertCell();
+            const note = car.note || '';
+            const ratingBg = this._getRatingColor(car.metadata?.sort);
+
+            cell.style.cssText = `
+                padding: 8px;
+                border: 1px solid #ddd;
+                text-align: left;
+                font-size: 11px;
+                background: ${ratingBg};
+                vertical-align: top;
+                white-space: pre-wrap;
+                max-width: 160px;
+                word-break: break-word;
+            `;
+            cell.textContent = note || '—';
+        });
+    },
+
+    /**
      * Add a row to the comparison table
      * @param {HTMLTableSectionElement} tbody - Table body
      * @param {string} label - Row label
      * @param {Array} carList - List of cars
-     * @param {Function} getValue - Function to get value for each car
-     * @param {number} priority - Feature priority (unused)
+     * @param {Function} getValue - Function to get display value for each car
+     * @param {number} priority - Feature priority (0=low, 1=medium, 2=high) — affects feature cell color
      * @param {boolean} isHtml - If true, value is treated as HTML content
+     * @param {Function} [getColor] - Optional fn(car) → { bg, text } to override cell color
      */
-    _addCompareRow(tbody, label, carList, getValue, priority = 0, isHtml = false) {
+    _addCompareRow(tbody, label, carList, getValue, priority = 0, isHtml = false, getColor = null) {
         const row = tbody.insertRow();
         row.style.cssText = 'border-bottom: 1px solid #ddd;';
 
@@ -154,52 +239,120 @@ window.CompareTable = {
             const ratingBgColor = this._getRatingColor(car.metadata?.sort);
 
             // Style based on feature state (for features with ✓, ✗, ?)
+            // Colors match side panel (UIComponents.createFeaturesGrid) — priority-aware
             if (value === '✓') {
                 cell.textContent = '✓';
                 cell.style.cssText = `
                     padding: 8px;
                     border: 1px solid #ddd;
                     text-align: center;
-                    background: #c8e6c9;
+                    background: #E8F5E9;
                     color: #2e7d32;
                     font-weight: bold;
                 `;
             } else if (value === '✗') {
+                // Missing: high priority → red, medium → yellow, low → white
+                const missingBg = priority === 2 ? '#FFCDD2' : priority === 1 ? '#FFF9C4' : '#FFFFFF';
+                const missingColor = priority === 2 ? '#c62828' : priority === 1 ? '#F57F17' : '#999';
                 cell.textContent = '✗';
                 cell.style.cssText = `
                     padding: 8px;
                     border: 1px solid #ddd;
                     text-align: center;
-                    background: #ffcdd2;
-                    color: #c62828;
+                    background: ${missingBg};
+                    color: ${missingColor};
                     font-weight: bold;
                 `;
             } else if (value === '?') {
+                // Unknown: high priority → red, medium/low → near-white
+                const unknownBg = priority === 2 ? '#FFCDD2' : '#FAFAFA';
+                const unknownColor = priority === 2 ? '#c62828' : '#bbb';
                 cell.textContent = '?';
                 cell.style.cssText = `
                     padding: 8px;
                     border: 1px solid #ddd;
                     text-align: center;
-                    background: #fff9c4;
-                    color: #f57f17;
+                    background: ${unknownBg};
+                    color: ${unknownColor};
                     font-weight: bold;
                 `;
             } else {
-                // Regular fields - apply rating background color
+                // Regular fields — use getColor if provided, otherwise fall back to rating color
                 if (isHtml) {
                     cell.innerHTML = value;
                 } else {
                     cell.textContent = value;
                 }
+                const color = getColor ? getColor(car) : null;
+                const bg   = color?.bg   || ratingBgColor;
+                const textColor = color?.text || '';
                 cell.style.cssText = `
                     padding: 8px;
                     border: 1px solid #ddd;
                     text-align: center;
                     font-size: 11px;
-                    background: ${ratingBgColor};
+                    font-weight: 500;
+                    background: ${bg};
+                    ${textColor ? `color: ${textColor};` : ''}
                 `;
             }
         });
+    },
+
+    /**
+     * Fetch og:image from a car listing URL.
+     * Streams the response and aborts as soon as the tag is found,
+     * so we never download the full page.
+     * @param {string} url
+     * @returns {Promise<string|null>}
+     */
+    async _fetchOgImage(url) {
+        if (this._ogImageCache[url] !== undefined) {
+            return this._ogImageCache[url];
+        }
+
+        const controller = new AbortController();
+        let imageUrl = null;
+
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let chunk = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                chunk += decoder.decode(value, { stream: true });
+
+                // Try both attribute orderings
+                const match =
+                    chunk.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                    chunk.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+
+                if (match) {
+                    imageUrl = match[1];
+                    controller.abort();
+                    break;
+                }
+
+                // Stop after 100 KB — og:image is always in <head>
+                if (chunk.length > 100_000) {
+                    controller.abort();
+                    break;
+                }
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.warn('[CompareTable._fetchOgImage] Error:', err.message, url);
+            }
+        }
+
+        this._ogImageCache[url] = imageUrl;
+        return imageUrl;
     },
 
     /**

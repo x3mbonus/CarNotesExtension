@@ -8,9 +8,10 @@ window.ComparePanel = {
      * Show comparison modal with filtering options
      */
     async showCompareModal(currentCarSort = null, currentCarId = null) {
-        // Default filter: show sort 0 and 1
+        // Default filter: show sort 0 and 1, exclude sold
         let selectedRatings = [0, 1];
         let maxCars = 10;
+        let includeSold = false;
 
         // Create modal
         const modal = document.createElement('div');
@@ -162,6 +163,31 @@ window.ComparePanel = {
         maxLabel.appendChild(maxInput);
         filterSection.appendChild(maxLabel);
 
+        // Sold checkbox (default: unchecked = exclude sold)
+        const soldLabel = document.createElement('label');
+        soldLabel.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #ffebee;
+            color: #c62828;
+            font-weight: 600;
+        `;
+        const soldCheckbox = document.createElement('input');
+        soldCheckbox.type = 'checkbox';
+        soldCheckbox.checked = includeSold;
+        soldCheckbox.onchange = () => {
+            includeSold = soldCheckbox.checked;
+            updateTable();
+        };
+        soldLabel.appendChild(soldCheckbox);
+        soldLabel.appendChild(document.createTextNode('🏷️ Include Sold'));
+        filterSection.appendChild(soldLabel);
+
         // Body
         const body = document.createElement('div');
         body.style.cssText = `
@@ -179,7 +205,8 @@ window.ComparePanel = {
                     selectedRatings,
                     maxCars,
                     currentCarId,
-                    currentCarSort
+                    currentCarSort,
+                    includeSold
                 );
 
                 if (cars.length === 0) {
@@ -235,7 +262,7 @@ window.ComparePanel = {
      * Current car without rating appears first
      * OPTIMIZED: Fetches all car features in ONE batch request instead of N individual requests
      */
-    async _fetchAndSortCars(selectedRatings, maxCars, currentCarId, currentCarSort) {
+    async _fetchAndSortCars(selectedRatings, maxCars, currentCarId, currentCarSort, includeSold = false) {
         try {
             // STEP 1: Get all cars
             const cars = await window.SupabaseApi?.getAllCars?.() || [];
@@ -255,6 +282,8 @@ window.ComparePanel = {
                 return {
                     carId: car.car_id,
                     isCurrentCar: car.car_id === currentCarId,
+                    sold: car.sold || false,
+                    note: car.text || '',
                     metadata: {
                         make: car.make,
                         model: car.model,
@@ -279,8 +308,9 @@ window.ComparePanel = {
             const currentCar = carList.find(c => c.isCurrentCar);
             const otherCars = carList.filter(c => !c.isCurrentCar);
 
-            // Filter by selected ratings
+            // Filter by selected ratings and sold status
             const filteredCars = otherCars.filter(c => {
+                if (!includeSold && c.sold) return false;
                 const carRating = c.metadata.sort === null ? 'null' : c.metadata.sort;
                 return selectedRatings.includes(carRating);
             });
@@ -313,16 +343,18 @@ window.ComparePanel = {
                 return aPrice - bPrice;
             });
 
-            // Build result: current car first (if no rating), then filtered cars
+            // Build result: current car ALWAYS first, then filtered cars (up to maxCars total)
             const result = [];
 
-            if (currentCar && currentCarSort === null && selectedRatings.includes('null')) {
+            if (currentCar) {
                 result.push(currentCar);
             }
 
-            result.push(...filteredCars.slice(0, maxCars));
+            // Add other cars, reserving space for current car
+            const remainingSlots = Math.max(0, maxCars - result.length);
+            result.push(...filteredCars.slice(0, remainingSlots));
 
-            return result.slice(0, maxCars); // Ensure we don't exceed max
+            return result;
         } catch (error) {
             console.error('[CAR-NOTES] Error fetching cars:', error);
             return [];
@@ -330,84 +362,31 @@ window.ComparePanel = {
     },
 
     /**
-     * Fetch ALL car features in ONE batch request instead of N individual requests
+     * Fetch features for all given car IDs in parallel using the proven SupabaseApi.getCarFeatures path.
      * @param {Array} carIds - Array of car IDs to fetch features for
      * @returns {Object} Map of { carId: { featureKey: state } }
      */
     async _fetchAllCarFeatures(carIds) {
-        if (!carIds || carIds.length === 0) {
-            return {};
-        }
+        if (!carIds || carIds.length === 0) return {};
 
-        try {
-            if (!await window.SupabaseClient.isReady()) {
-                return {};
-            }
-
-            const TABLE_CAR_FEATURES = `car_features`;
-
-            // Construct query: fetch all car_features for the given car IDs
-            // Note: We query all features and filter in-memory by carIds to keep it simple
-            // This is still just ONE request instead of N individual requests (huge optimization!)
-            const url = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_FEATURES}?select=car_id,feature_id,state`;
-
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'apikey': window.SupabaseClient.key,
-                    'Content-Type': 'application/json'
+        const results = await Promise.all(
+            carIds.map(async carId => {
+                try {
+                    const features = await window.SupabaseApi.getCarFeatures(carId);
+                    return { carId, features: features || {} };
+                } catch (err) {
+                    console.warn('[ComparePanel._fetchAllCarFeatures] Error for car', carId, err);
+                    return { carId, features: {} };
                 }
-            });
+            })
+        );
 
-            if (!response.ok) {
-                console.warn('[CAR-NOTES] Failed to fetch car features:', response.status);
-                return {};
-            }
+        const carFeaturesMap = {};
+        results.forEach(({ carId, features }) => {
+            carFeaturesMap[carId] = features;
+        });
 
-            const allFeatures = await response.json();
-            console.log('[ComparePanel._fetchAllCarFeatures] Raw API response:', allFeatures.length, 'rows');
-
-            if (allFeatures.length === 0) {
-                console.warn('[ComparePanel._fetchAllCarFeatures] ⚠️ WARNING: car_features table is EMPTY! No features found in database.');
-                return {};
-            }
-
-            // Get feature config from FeaturesManager (uses caching: in-memory + localStorage)
-            const featureConfig = await window.FeaturesManager?.getFeatureConfig?.() || [];
-            console.log('[ComparePanel._fetchAllCarFeatures] Feature config:', featureConfig.length, 'features');
-
-            const idToKey = {};
-            featureConfig.forEach(fc => {
-                idToKey[fc.id] = fc.key;
-            });
-            console.log('[ComparePanel._fetchAllCarFeatures] ID->Key mapping:', idToKey);
-
-            // Build result map: { carId: { featureKey: state } }
-            const carFeaturesMap = {};
-            const carIdSet = new Set(carIds);
-
-            allFeatures.forEach(row => {
-                // Only include features for cars we care about
-                if (!carIdSet.has(row.car_id)) return;
-
-                if (!carFeaturesMap[row.car_id]) {
-                    carFeaturesMap[row.car_id] = {};
-                }
-
-                const featureKey = idToKey[row.feature_id];
-                if (featureKey) {
-                    carFeaturesMap[row.car_id][featureKey] = row.state;
-                } else {
-                    console.warn('[ComparePanel._fetchAllCarFeatures] No key mapping for feature_id:', row.feature_id);
-                }
-            });
-
-            console.log('[CAR-NOTES] Batch loaded features for', Object.keys(carFeaturesMap).length, 'cars in ONE request (instead of', carIds.length, 'individual requests)');
-            console.log('[ComparePanel._fetchAllCarFeatures] Final carFeaturesMap:', carFeaturesMap);
-            return carFeaturesMap;
-        } catch (error) {
-            console.error('[CAR-NOTES] Error fetching batch car features:', error);
-            return {};
-        }
+        console.log('[ComparePanel._fetchAllCarFeatures] Loaded features for', Object.keys(carFeaturesMap).length, 'cars');
+        return carFeaturesMap;
     }
 };

@@ -74,6 +74,7 @@ window.NotesEditor = {
             color: existingNote?.color || '#e0e0e0',
             sort: existingNote?.sort ?? null,
             confirmed: existingNote?.confirmed || false,
+            sold: existingNote?.sold || false,
             features: existingNote?.features || {},
             // Metadata fields
             make: existingNote?.make || '',
@@ -85,7 +86,9 @@ window.NotesEditor = {
             seat_type: existingNote?.seat_type || '',
             climate: existingNote?.climate || '',
             owners: existingNote?.owners || '',
-            tow_hitch_type: existingNote?.tow_hitch_type || ''
+            tow_hitch_type: existingNote?.tow_hitch_type || '',
+            url: existingNote?.url || '',
+            address: existingNote?.address || ''
         };
 
         // Auto-populate metadata from extracted data if not already set
@@ -104,6 +107,8 @@ window.NotesEditor = {
                     if (!state.price_eur && parsedMetadata.price_eur) { state.price_eur = parsedMetadata.price_eur; }
                     if (!state.mileage && parsedMetadata.mileage) { state.mileage = parsedMetadata.mileage; }
                     if (!state.year && parsedMetadata.year) { state.year = parsedMetadata.year; }
+                    if (!state.url && parsedMetadata.url) { state.url = parsedMetadata.url; }
+                    if (!state.address && parsedMetadata.address) { state.address = parsedMetadata.address; }
 
                     // Auto-save extracted metadata to database immediately
                     console.log('[CAR-NOTES] Saving auto-extracted metadata...');
@@ -113,7 +118,9 @@ window.NotesEditor = {
                         price: state.price,
                         price_eur: state.price_eur,
                         mileage: state.mileage,
-                        year: state.year
+                        year: state.year,
+                        url: state.url,
+                        address: state.address
                     };
 
                     // Save all auto-extracted fields in parallel
@@ -164,6 +171,9 @@ window.NotesEditor = {
         } else {
             console.log(`[CAR-NOTES] Using existing features (${Object.keys(state.features).length} features)`);
         }
+
+        // Ensure features config is cached before building the UI (getFeaturesList is sync)
+        await window.FeaturesManager?.getFullFeaturesConfig?.();
 
         // ===== CREATE UI =====
         const container = this.createUI(state, displayMode, article, targetContainer, onClose, editorKey);
@@ -333,36 +343,59 @@ window.NotesEditor = {
 
         sections.appendChild(noteSection);
 
-        // VERIFICATION section
-        const verifySection = document.createElement('div');
-        verifySection.className = 'modal-section';
-        verifySection.appendChild(window.UIComponents.createSectionLabel('VERIFICATION STATUS'));
+        // VERIFICATION + AVAILABILITY — compact single row
+        const statusSection = document.createElement('div');
+        statusSection.className = 'modal-section';
+
+        const statusRow = document.createElement('div');
+        statusRow.style.cssText = 'display: flex; gap: 8px; align-items: center;';
 
         let verifyBtn = window.UIComponents.createVerificationButton(
             state.confirmed,
             async () => {
                 state.confirmed = !state.confirmed;
-                console.log('[CAR-NOTES] Toggling verified to:', state.confirmed);
-                window.NotesEditor.showSaveNotification('Saving verification...', 'info', 3000);
+                window.NotesEditor.showSaveNotification('Saving...', 'info', 3000);
                 try {
-                    // Save ONLY the verified status to database (independent operation)
                     await window.NoteCallbacks.updateVerified(state.carId, state.confirmed);
-                    // Update button UI
-                    verifyBtn.textContent = state.confirmed ? '✓ Verified' : '○ Not Verified';
-                    if (state.confirmed) {
-                        verifyBtn.setAttribute('data-verified', 'true');
-                    } else {
-                        verifyBtn.removeAttribute('data-verified');
-                    }
-                    window.NotesEditor.showSaveNotification('Verification saved', 'success', 2000);
+                    verifyBtn.textContent = state.confirmed ? '✓ Перевірено' : '○ Не перевірено';
+                    if (state.confirmed) verifyBtn.setAttribute('data-verified', 'true');
+                    else verifyBtn.removeAttribute('data-verified');
+                    window.NotesEditor.showSaveNotification('Збережено', 'success', 2000);
                 } catch (error) {
                     console.error('[CAR-NOTES] Error updating verified:', error);
-                    window.NotesEditor.showSaveNotification('Failed to save verification', 'error', 3000);
+                    window.NotesEditor.showSaveNotification('Помилка', 'error', 3000);
                 }
             }
         );
-        verifySection.appendChild(verifyBtn);
-        sections.appendChild(verifySection);
+        // Override text to Ukrainian
+        verifyBtn.textContent = state.confirmed ? '✓ Перевірено' : '○ Не перевірено';
+
+        let soldBtn = window.UIComponents.createSoldToggle(
+            state.sold,
+            async () => {
+                state.sold = !state.sold;
+                window.NotesEditor.showSaveNotification('Saving...', 'info', 3000);
+                try {
+                    await window.NoteCallbacks.updateSold(state.carId, state.sold);
+                    soldBtn.textContent = state.sold ? '🏷️ Продано' : '○ Доступний';
+                    soldBtn.style.border = `2px solid ${state.sold ? '#e53935' : '#9e9e9e'}`;
+                    soldBtn.style.background = state.sold ? '#ffebee' : 'white';
+                    soldBtn.style.color = state.sold ? '#c62828' : '#666';
+                    if (state.sold) soldBtn.setAttribute('data-sold', 'true');
+                    else soldBtn.removeAttribute('data-sold');
+                    window.NotesEditor.showSaveNotification('Збережено', 'success', 2000);
+                } catch (error) {
+                    console.error('[CAR-NOTES] Error updating sold:', error);
+                    window.NotesEditor.showSaveNotification('Помилка', 'error', 3000);
+                }
+            }
+        );
+        soldBtn.textContent = state.sold ? '🏷️ Продано' : '○ Доступний';
+
+        statusRow.appendChild(verifyBtn);
+        statusRow.appendChild(soldBtn);
+        statusSection.appendChild(statusRow);
+        sections.appendChild(statusSection);
 
         // METADATA section
         const metadataSection = document.createElement('div');
@@ -387,7 +420,6 @@ window.NotesEditor = {
         ));
         sections.appendChild(metadataSection);
 
-        // FEATURES section
         const featuresSection = document.createElement('div');
         featuresSection.className = 'modal-section';
         const featuresLabel = window.UIComponents.createSectionLabel('FEATURES');

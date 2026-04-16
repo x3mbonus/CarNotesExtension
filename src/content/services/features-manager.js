@@ -9,66 +9,19 @@ window.FeaturesManager = {
 
     /**
      * Get full features list with config and metadata
-     * This is used globally by UI components to avoid recreating lists
+     * Derived from DB via getFeatureConfig() - single source of truth
      */
     async getFullFeaturesConfig() {
-        // Return cache if available
-        if (this.fullFeaturesListCache) {
+        if (this.fullFeaturesListCache?.length) {
             return this.fullFeaturesListCache;
         }
 
-        // Build the full features list with priority metadata
-        this.fullFeaturesListCache = [
-            // HIGH priority features - show RED when not true
-            { label: 'ACC', key: 'feature_acc', priority: 2 },
-            { label: 'Android Auto / CarPlay', key: 'feature_android_auto_carplay', priority: 2 },
-            { label: 'Камера', key: 'feature_camera', priority: 2 },
-            { label: 'Парктроніки', key: 'feature_parking_sensors', priority: 2 },
-            { label: 'Blind spot', key: 'feature_blind_spot', priority: 2 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Lane assist', key: 'feature_lane_assist', priority: 1 },
-            { label: 'Знаки', key: 'feature_signs', priority: 1 },
-
-            // LOW priority features
-            { label: 'Rear traffic alert', key: 'feature_rear_traffic_alert', priority: 0 },
-            { label: 'Traffic Jam Assist', key: 'feature_traffic_jam_assist', priority: 0 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Keyless', key: 'feature_keyless', priority: 1 },
-            { label: 'Digital cockpit', key: 'feature_digital_cockpit', priority: 1 },
-            { label: 'Підігрів сидінь', key: 'feature_heated_seats', priority: 1 },
-
-            // LOW priority features
-            { label: 'Підігрів лобового', key: 'feature_heated_windshield', priority: 0 },
-            { label: 'Підігрів керма', key: 'feature_heated_steering_wheel', priority: 0 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Масаж', key: 'feature_massage_seats', priority: 1 },
-
-            // LOW priority features
-            { label: 'Пам\'ять сидінь', key: 'feature_memory_seats', priority: 0 },
-            { label: 'DCC', key: 'feature_dcc', priority: 0 },
-            { label: 'Webasto', key: 'feature_webasto', priority: 0 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Matrix', key: 'feature_matrix_headlights', priority: 1 },
-
-            // LOW priority features
-            { label: 'Автопаркування', key: 'feature_auto_parking', priority: 0 },
-            { label: '360 камера', key: 'feature_360_camera', priority: 0 },
-
-            // HIGH priority features - show RED when not true
-            { label: 'Фаркоп', key: 'feature_tow_hitch', priority: 2 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Електробагажник', key: 'feature_electric_tailgate', priority: 1 },
-
-            // LOW priority features
-            { label: 'Автобагажник', key: 'feature_auto_tailgate', priority: 0 },
-            { label: 'Панорама', key: 'feature_panoramic_roof', priority: 0 },
-            { label: 'HUD', key: 'feature_hud', priority: 0 }
-        ];
+        const config = await this.getFeatureConfig();
+        this.fullFeaturesListCache = config.map(f => ({
+            label: f.label,
+            key: f.key,
+            priority: f.priority
+        }));
 
         console.log('[FeaturesManager] Cached full features list:', this.fullFeaturesListCache.length, 'features');
         return this.fullFeaturesListCache;
@@ -79,7 +32,7 @@ window.FeaturesManager = {
      */
     async getFeatureConfig(forceRefresh = false) {
         // Check in-memory cache first (unless forcing refresh)
-        if (!forceRefresh && this.featureConfigCache) {
+        if (!forceRefresh && this.featureConfigCache?.length) {
             console.log('[FeaturesManager.getFeatureConfig] ✅ In-memory cache HIT');
             return this.featureConfigCache;
         }
@@ -89,6 +42,9 @@ window.FeaturesManager = {
             console.log('[FeaturesManager.getFeatureConfig] 🔄 FORCED REFRESH - skipping cache');
             try {
                 this.featureConfigCache = await window.SupabaseApi.getFeatureConfig();
+                this.fullFeaturesListCache = this.featureConfigCache.map(f => ({
+                    label: f.label, key: f.key, priority: f.priority
+                }));
                 this.saveFeatureConfigToStorage(this.featureConfigCache);
                 console.log('[FeaturesManager.getFeatureConfig] ✅ Refreshed from API:', this.featureConfigCache.length, 'features');
                 return this.featureConfigCache;

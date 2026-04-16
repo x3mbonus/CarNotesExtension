@@ -73,6 +73,14 @@ window.NoteCallbacks = {
     },
 
     /**
+     * Update sold status (independent operation)
+     */
+    async updateSold(carId, sold) {
+        console.log('[NoteCallbacks.updateSold] Updating sold to', sold, 'for', carId);
+        return await window.SupabaseApi?.updateSold?.(carId, sold) || { success: true };
+    },
+
+    /**
      * Update single metadata field (independent operation)
      */
     async updateMetadataField(carId, fieldName, fieldValue) {

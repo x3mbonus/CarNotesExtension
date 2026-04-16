@@ -4,6 +4,7 @@ window.CarDetailPanel = {
     currentCarId: null,
     currentFeatures: null,
     isVerified: false,
+    isSold: false,
     currentSort: -1,  // -1 = excluded, 0-3 = sort levels
     currentNote: '',
     currentColor: '#e0e0e0',  // Default to gray (no rating) for new notes
@@ -95,7 +96,8 @@ window.CarDetailPanel = {
             console.log('[CAR-NOTES] getCarDataMetadata returned:', noteData);
             if (noteData) {
                 this.currentNote = noteData.text || '';
-                this.currentColor = noteData.color || '#e0e0e0';  // Default to gray (no rating) if not set
+                this.currentColor = noteData.color || '#e0e0e0';
+                this.isSold = noteData.sold || false;
                 // Load metadata from note data
                 this.currentMake = noteData.make || '';
                 this.currentModel = noteData.model || '';
@@ -139,7 +141,7 @@ window.CarDetailPanel = {
             top: 80px;
             right: 0;
             height: calc(100vh - 80px);
-            z-index: 10000;
+            z-index: 2147483647;
             max-width: 500px;
             width: 100%;
             transition: transform 0.3s ease;
@@ -216,6 +218,7 @@ window.CarDetailPanel = {
                 if (carData) {
                     this.currentFeatures = carData.features || {};
                     this.isVerified = carData.confirmed || false;
+                    this.isSold = carData.sold || false;
                     this.currentSort = carData.sort ?? null;
                     this.currentNote = carData.text || '';
                     this.currentColor = carData.color || '#e0e0e0';
@@ -302,7 +305,7 @@ window.CarDetailPanel = {
             position: fixed;
             top: 100px;
             right: 20px;
-            z-index: 10002;
+            z-index: 2147483647;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             color: white;
@@ -363,6 +366,24 @@ window.CarDetailPanel = {
         this.panelElement = panel;
         this.wrapperElement = wrapper;
         console.log('✅ Panel structure created and appended to DOM');
+
+        // Keep panel on top: re-append wrapper and expandBtn whenever the site
+        // adds new nodes to <body> (carousels, lightboxes, etc. appear after us).
+        const bringToFront = () => {
+            if (wrapper.parentNode) document.body.appendChild(wrapper);
+            if (expandBtn.parentNode) document.body.appendChild(expandBtn);
+        };
+        const domObserver = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                for (const node of m.addedNodes) {
+                    if (node !== wrapper && node !== expandBtn && node.nodeType === 1) {
+                        bringToFront();
+                        return;
+                    }
+                }
+            }
+        });
+        domObserver.observe(document.body, { childList: true });
     },
 
     /**
@@ -385,6 +406,7 @@ window.CarDetailPanel = {
                 color: this.currentColor,
                 sort: this.currentSort,
                 confirmed: this.isVerified,
+                sold: this.isSold,
                 features: this.currentFeatures || {},
                 make: this.currentMake,
                 model: this.currentModel,
@@ -576,6 +598,7 @@ window.CarDetailPanel = {
         this.currentCarId = null;
         this.currentFeatures = null;
         this.isVerified = false;
+        this.isSold = false;
         this.currentSort = -1;
         this.currentNote = '';
         this.currentColor = '#e0e0e0';

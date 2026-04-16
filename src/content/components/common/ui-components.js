@@ -140,15 +140,38 @@ window.UIComponents = {
         return select;
     },
 
+    // Render sold toggle button
+    createSoldToggle(isSold, onToggle) {
+        const btn = document.createElement('button');
+        btn.className = 'ui-sold-btn';
+        btn.textContent = isSold ? '🏷️ Sold' : '○ Available';
+        if (isSold) btn.setAttribute('data-sold', 'true');
+
+        btn.style.cssText = `
+            padding: 6px 12px;
+            border: 2px solid ${isSold ? '#e53935' : '#9e9e9e'};
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            background: ${isSold ? '#ffebee' : 'white'};
+            color: ${isSold ? '#c62828' : '#666'};
+            transition: all 0.2s;
+        `;
+
+        if (onToggle) btn.addEventListener('click', onToggle);
+        return btn;
+    },
+
     // Render verification toggle button
     createVerificationButton(isVerified, onToggle) {
         const btn = document.createElement('button');
         btn.className = 'ui-verification-btn';
         if (isVerified) {
             btn.setAttribute('data-verified', 'true');
-            btn.textContent = '✓ Verified';
+            btn.textContent = '✓ Перевірено';
         } else {
-            btn.textContent = '○ Not Verified';
+            btn.textContent = '○ Не перевірено';
         }
 
         if (onToggle) {
@@ -215,69 +238,9 @@ window.UIComponents = {
         return container;
     },
 
-    // Get standard features list - ordered by user preference
+    // Get standard features list from FeaturesManager cache (populated at startup)
     getFeaturesList() {
-        // Use cached full features config from FeaturesManager instead of recreating array
-        return window.FeaturesManager?.fullFeaturesListCache ||
-               this.getFeaturesListFallback();
-    },
-
-    /**
-     * Fallback features list if FeaturesManager cache not available yet
-     * (same list as FeaturesManager.getFullFeaturesConfig)
-     */
-    getFeaturesListFallback() {
-        return [
-            // HIGH priority features - show RED when not true
-            { label: 'ACC', key: 'feature_acc', priority: 2 },
-            { label: 'Android Auto / CarPlay', key: 'feature_android_auto_carplay', priority: 2 },
-            { label: 'Камера', key: 'feature_camera', priority: 2 },
-            { label: 'Парктроніки', key: 'feature_parking_sensors', priority: 2 },
-            { label: 'Blind spot', key: 'feature_blind_spot', priority: 2 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Lane assist', key: 'feature_lane_assist', priority: 1 },
-            { label: 'Знаки', key: 'feature_signs', priority: 1 },
-
-            // LOW priority features
-            { label: 'Rear traffic alert', key: 'feature_rear_traffic_alert', priority: 0 },
-            { label: 'Traffic Jam Assist', key: 'feature_traffic_jam_assist', priority: 0 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Keyless', key: 'feature_keyless', priority: 1 },
-            { label: 'Digital cockpit', key: 'feature_digital_cockpit', priority: 1 },
-            { label: 'Підігрів сидінь', key: 'feature_heated_seats', priority: 1 },
-
-            // LOW priority features
-            { label: 'Підігрів лобового', key: 'feature_heated_windshield', priority: 0 },
-            { label: 'Підігрів керма', key: 'feature_heated_steering_wheel', priority: 0 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Масаж', key: 'feature_massage_seats', priority: 1 },
-
-            // LOW priority features
-            { label: 'Пам\'ять сидінь', key: 'feature_memory_seats', priority: 0 },
-            { label: 'DCC', key: 'feature_dcc', priority: 0 },
-            { label: 'Webasto', key: 'feature_webasto', priority: 0 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Matrix', key: 'feature_matrix_headlights', priority: 1 },
-
-            // LOW priority features
-            { label: 'Автопаркування', key: 'feature_auto_parking', priority: 0 },
-            { label: '360 камера', key: 'feature_360_camera', priority: 0 },
-
-            // HIGH priority features - show RED when not true
-            { label: 'Фаркоп', key: 'feature_tow_hitch', priority: 2 },
-
-            // MEDIUM priority (normal priority) features
-            { label: 'Електробагажник', key: 'feature_electric_tailgate', priority: 1 },
-
-            // LOW priority features
-            { label: 'Автобагажник', key: 'feature_auto_tailgate', priority: 0 },
-            { label: 'Панорама', key: 'feature_panoramic_roof', priority: 0 },
-            { label: 'HUD', key: 'feature_hud', priority: 0 }
-        ];
+        return window.FeaturesManager?.fullFeaturesListCache || [];
     },
 
     // Render metadata section (above features) - compact version with Ukrainian labels only
@@ -370,150 +333,7 @@ window.UIComponents = {
             }
         }
 
-        /**
-         * Determine background color based on metadata value
-         */
-        const getMetadataColor = (field, value) => {
-            if (!value) return { bg: 'white', text: '#333' };
-
-// YEAR: Material Design green scale matching features
-            // 2024: wow, 2023: super, 2022: good, 2021: better, 2020: ok, older: gray/yellow/orange
-            if (field === 'year') {
-                const yearMatch = value.toString().match(/\d{4}/);
-                if (yearMatch) {
-                    const year = parseInt(yearMatch[0]);
-
-                    if (year >= 2024) {
-                        return { bg: '#1B5E20', text: '#FFFFFF' };  // Dark green #1B5E20 - wow
-                    } else if (year >= 2023) {
-                        return { bg: '#388E3C', text: '#FFFFFF' };  // Material Green - super
-                    } else if (year >= 2022) {
-                        return { bg: '#4CAF50', text: '#FFFFFF' };  // Material Green - good
-                    } else if (year >= 2021) {
-                        return { bg: '#7CB342', text: '#FFFFFF' };  // Material Light-Dark Green - better
-                    } else if (year >= 2020) {
-                        return { bg: '#E8F5E9', text: '#1b5e20' };  // Material Light Green - ok (matches features.active)
-                    } else if (year >= 2015) {
-                        return { bg: '#f5f5f5', text: '#666' };     // Gray (matches features neutral)
-                    } else if (year >= 2010) {
-                        return { bg: '#FFF9C4', text: '#F57F17' };  // Yellow (matches features.priority-medium-missing)
-                    } else {
-                        return { bg: '#FFCDD2', text: '#C62828' };  // Light red (matches features.priority-missing)
-                    }
-                }
-                return { bg: 'white', text: '#333' };
-            }
-
-            // MILEAGE: Material Design scale matching features
-            if (field === 'mileage') {
-                const mileageMatch = value.toString().match(/(\d+)/);
-                if (mileageMatch) {
-                    const km = parseInt(mileageMatch[1]);
-
-                    if (km <= 50000) {
-                        return { bg: '#1B5E20', text: '#FFFFFF' };  // Dark green - surprisingly excellent
-                    } else if (km <= 80000) {
-                        return { bg: '#388E3C', text: '#FFFFFF' };  // Material Green - excellent
-                    } else if (km <= 100000) {
-                        return { bg: '#4CAF50', text: '#FFFFFF' };  // Green - very good
-                    } else if (km <= 120000) {
-                        return { bg: '#7CB342', text: '#FFFFFF' };  // Light-dark green - good
-                    } else if (km <= 140000) {
-                        return { bg: '#E8F5E9', text: '#1b5e20' };  // Light green - ok (matches features.active)
-                    } else if (km <= 160000) {
-                        return { bg: '#FFF9C4', text: '#F57F17' };  // Yellow - much (matches features.priority-medium-missing)
-                    } else if (km <= 180000) {
-                        return { bg: '#FFD54F', text: '#E65100' };  // Amber - too much
-                    } else if (km <= 200000) {
-                        return { bg: '#FFB74D', text: '#E65100' };  // Orange - too much
-                    } else {
-                        return { bg: '#FFCDD2', text: '#C62828' };  // Light red - definitely too much (matches features.priority-missing)
-                    }
-                }
-                return { bg: 'white', text: '#333' };
-            }
-
-            // PRICE: Material Design scale matching features
-            if (field === 'price' || field === 'price_eur') {
-                const cleanValue = value.toString().replace(/\s+/g, '').replace(/,/g, '');
-                const priceMatch = cleanValue.match(/\d+/);
-                if (priceMatch) {
-                    const price = parseInt(priceMatch[0]);
-
-                    // Use different thresholds for PLN vs EUR
-                    if (field === 'price_eur') {
-                        // EUR thresholds: 17k: very good, 18k: good, 19k: ok, 20k: can live, 21k: much, 22k: too much, 23k+: definitely too much
-                        if (price <= 17000) {
-                            return { bg: '#1B5E20', text: '#FFFFFF' };  // Dark green - very good
-                        } else if (price <= 18000) {
-                            return { bg: '#388E3C', text: '#FFFFFF' };  // Material Green - good
-                        } else if (price <= 19000) {
-                            return { bg: '#4CAF50', text: '#FFFFFF' };  // Green - ok
-                        } else if (price <= 20000) {
-                            return { bg: '#E8F5E9', text: '#1b5e20' };  // Light green - can live with (matches features.active)
-                        } else if (price <= 21000) {
-                            return { bg: '#FFF9C4', text: '#F57F17' };  // Yellow - much (matches features.priority-medium-missing)
-                        } else if (price <= 22000) {
-                            return { bg: '#FFB74D', text: '#E65100' };  // Orange - too much
-                        } else {
-                            return { bg: '#FFCDD2', text: '#C62828' };  // Light red - definitely too much (matches features.priority-missing)
-                        }
-                    } else {
-                        // PLN thresholds (converted from EUR thresholds: EUR × 100 / 23.50)
-                        if (price <= 72000) {
-                            return { bg: '#1B5E20', text: '#FFFFFF' };  // Dark green - very good
-                        } else if (price <= 77000) {
-                            return { bg: '#388E3C', text: '#FFFFFF' };  // Material Green - good
-                        } else if (price <= 81000) {
-                            return { bg: '#4CAF50', text: '#FFFFFF' };  // Green - ok
-                        } else if (price <= 85000) {
-                            return { bg: '#E8F5E9', text: '#1b5e20' };  // Light green - can live with (matches features.active)
-                        } else if (price <= 89000) {
-                            return { bg: '#FFF9C4', text: '#F57F17' };  // Yellow - much (matches features.priority-medium-missing)
-                        } else if (price <= 94000) {
-                            return { bg: '#FFB74D', text: '#E65100' };  // Orange - too much
-                        } else {
-                            return { bg: '#FFCDD2', text: '#C62828' };  // Light red - definitely too much (matches features.priority-missing)
-                        }
-                    }
-                }
-                return { bg: 'white', text: '#333' };
-            }
-
-            // Seat type: Alcantara/Leather=good, Cloth=bad, others=neutral
-            if (field === 'seat_type') {
-                if (value === 'Alcantara' || value === 'Leather') {
-                    return { bg: '#E8F5E9', text: '#1b5e20' };  // Green - good
-                } else if (value === 'Cloth' || value === 'Fabric') {
-                    return { bg: '#FFEBEE', text: '#c62828' };  // Red - bad
-                } else {
-                    return { bg: '#FFF9C4', text: '#F57F17' };  // Yellow - neutral
-                }
-            }
-
-            // Owners: 1=good, others=bad
-            if (field === 'owners') {
-                if (value === '1') {
-                    return { bg: '#E8F5E9', text: '#1b5e20' };  // Green - good
-                } else {
-                    return { bg: '#FFEBEE', text: '#c62828' };  // Red - bad
-                }
-            }
-
-            // Tow hitch: Swiveling=best, No=bad, others=ok
-            if (field === 'tow_hitch_type') {
-                if (value === 'Swiveling') {
-                    return { bg: '#C8E6C9', text: '#1b5e20' };  // Dark green - best
-                } else if (value === 'No') {
-                    return { bg: '#FFEBEE', text: '#c62828' };  // Red - bad
-                } else {
-                    return { bg: '#FFF9C4', text: '#F57F17' };  // Yellow - ok
-                }
-            }
-
-            // Climate: no coloring
-            return { bg: 'white', text: '#333' };
-        };
+        const getMetadataColor = (field, value) => this.getMetadataColor(field, value);
 
         metadataFields.forEach(field => {
             const container = document.createElement('div');
@@ -658,6 +478,90 @@ window.UIComponents = {
             '#A1887F',  // Taupe (muted) - optional
             '#C2E59C'   // Light green (muted) - optional
         ];
+    },
+
+    // Return { bg, text } colors for a metadata field value — same rules as side panel
+    getMetadataColor(field, value) {
+        if (!value) return { bg: 'white', text: '#333' };
+
+        if (field === 'year') {
+            const m = value.toString().match(/\d{4}/);
+            if (m) {
+                const y = parseInt(m[0]);
+                if (y >= 2024) return { bg: '#1B5E20', text: '#FFFFFF' };
+                if (y >= 2023) return { bg: '#388E3C', text: '#FFFFFF' };
+                if (y >= 2022) return { bg: '#4CAF50', text: '#FFFFFF' };
+                if (y >= 2021) return { bg: '#7CB342', text: '#FFFFFF' };
+                if (y >= 2020) return { bg: '#E8F5E9', text: '#1b5e20' };
+                if (y >= 2015) return { bg: '#f5f5f5', text: '#666' };
+                if (y >= 2010) return { bg: '#FFF9C4', text: '#F57F17' };
+                return { bg: '#FFCDD2', text: '#C62828' };
+            }
+            return { bg: 'white', text: '#333' };
+        }
+
+        if (field === 'mileage') {
+            const m = value.toString().match(/(\d+)/);
+            if (m) {
+                const km = parseInt(m[1]);
+                if (km <= 50000)  return { bg: '#1B5E20', text: '#FFFFFF' };
+                if (km <= 80000)  return { bg: '#388E3C', text: '#FFFFFF' };
+                if (km <= 100000) return { bg: '#4CAF50', text: '#FFFFFF' };
+                if (km <= 120000) return { bg: '#7CB342', text: '#FFFFFF' };
+                if (km <= 140000) return { bg: '#E8F5E9', text: '#1b5e20' };
+                if (km <= 160000) return { bg: '#FFF9C4', text: '#F57F17' };
+                if (km <= 180000) return { bg: '#FFD54F', text: '#E65100' };
+                if (km <= 200000) return { bg: '#FFB74D', text: '#E65100' };
+                return { bg: '#FFCDD2', text: '#C62828' };
+            }
+            return { bg: 'white', text: '#333' };
+        }
+
+        if (field === 'price' || field === 'price_eur') {
+            const clean = value.toString().replace(/\s+/g, '').replace(/,/g, '');
+            const m = clean.match(/\d+/);
+            if (m) {
+                const p = parseInt(m[0]);
+                if (field === 'price_eur') {
+                    if (p <= 17000) return { bg: '#1B5E20', text: '#FFFFFF' };
+                    if (p <= 18000) return { bg: '#388E3C', text: '#FFFFFF' };
+                    if (p <= 19000) return { bg: '#4CAF50', text: '#FFFFFF' };
+                    if (p <= 20000) return { bg: '#E8F5E9', text: '#1b5e20' };
+                    if (p <= 21000) return { bg: '#FFF9C4', text: '#F57F17' };
+                    if (p <= 22000) return { bg: '#FFB74D', text: '#E65100' };
+                    return { bg: '#FFCDD2', text: '#C62828' };
+                } else {
+                    if (p <= 72000) return { bg: '#1B5E20', text: '#FFFFFF' };
+                    if (p <= 77000) return { bg: '#388E3C', text: '#FFFFFF' };
+                    if (p <= 81000) return { bg: '#4CAF50', text: '#FFFFFF' };
+                    if (p <= 85000) return { bg: '#E8F5E9', text: '#1b5e20' };
+                    if (p <= 89000) return { bg: '#FFF9C4', text: '#F57F17' };
+                    if (p <= 94000) return { bg: '#FFB74D', text: '#E65100' };
+                    return { bg: '#FFCDD2', text: '#C62828' };
+                }
+            }
+            return { bg: 'white', text: '#333' };
+        }
+
+        if (field === 'seat_type') {
+            if (value === 'Alcantara' || value === 'Leather') return { bg: '#E8F5E9', text: '#1b5e20' };
+            if (value === 'Cloth' || value === 'Fabric')      return { bg: '#FFEBEE', text: '#c62828' };
+            return { bg: '#FFF9C4', text: '#F57F17' };
+        }
+
+        if (field === 'owners') {
+            return value === '1'
+                ? { bg: '#E8F5E9', text: '#1b5e20' }
+                : { bg: '#FFEBEE', text: '#c62828' };
+        }
+
+        if (field === 'tow_hitch_type') {
+            if (value === 'Swiveling') return { bg: '#C8E6C9', text: '#1b5e20' };
+            if (value === 'No')        return { bg: '#FFEBEE', text: '#c62828' };
+            return { bg: '#FFF9C4', text: '#F57F17' };
+        }
+
+        return { bg: 'white', text: '#333' };
     },
 
     // Create section label
