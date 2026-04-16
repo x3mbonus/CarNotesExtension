@@ -74,6 +74,17 @@ window.UIComponents = {
         placeholderStyle.textContent = `[data-ta-id="${uniqueId}"]::placeholder { color: ${textColor}; opacity: 0.8; }`;
         document.head.appendChild(placeholderStyle);
 
+        // Stop keyboard events from reaching the page — both bubble and capture phase.
+        // Car listing sites intercept Space/Arrow keys (sometimes via capture listeners)
+        // which causes focus loss or page scroll while typing.
+        const stopKeys = (e) => e.stopPropagation();
+        textarea.addEventListener('keydown',  stopKeys, true);
+        textarea.addEventListener('keyup',    stopKeys, true);
+        textarea.addEventListener('keypress', stopKeys, true);
+        textarea.addEventListener('keydown',  stopKeys);
+        textarea.addEventListener('keyup',    stopKeys);
+        textarea.addEventListener('keypress', stopKeys);
+
         if (onInput) {
             textarea.addEventListener('input', onInput);
         }

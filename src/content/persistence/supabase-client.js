@@ -772,6 +772,31 @@ window.SupabaseApi = {
         }
     },
 
+    // Update multiple metadata fields in a single PATCH request
+    async updateMetadataFields(carId, fields) {
+        if (!await window.SupabaseClient.isReady()) {
+            return { success: false, reason: 'not_configured' };
+        }
+        try {
+            const updateUrl = `${window.SupabaseClient.url}/rest/v1/${TABLE_CAR_DATA}?car_id=eq.${encodeURIComponent(carId)}`;
+            const payload = { ...fields, updated_at: new Date().toISOString() };
+            const response = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: { 'apikey': window.SupabaseClient.key, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[CAR-NOTES] updateMetadataFields failed:', response.status, errorText);
+                return { success: false, error: errorText };
+            }
+            return { success: true };
+        } catch (error) {
+            console.error('[CAR-NOTES] Error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
     // Delete car data
     async deleteCarData(carId) {
         if (!await window.SupabaseClient.isReady()) {

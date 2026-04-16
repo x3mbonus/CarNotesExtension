@@ -4,7 +4,6 @@
  */
 
 window.CompareTable = {
-    _ogImageCache: {}, // url → imageUrl (or null)
     /**
      * Create a comparison table for multiple cars
      * @param {Array} carList - Array of car objects with carId, metadata, features, and sort
@@ -20,6 +19,8 @@ window.CompareTable = {
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            color-scheme: light;
+            color: #111;
         `;
 
         // Build table
@@ -30,65 +31,72 @@ window.CompareTable = {
             border-collapse: collapse;
             font-size: 12px;
             background: white;
+            color: #111;
         `;
 
         // Table header with car models
         const headerRow = table.createTHead().insertRow();
-        headerRow.style.cssText = 'background: #f5f5f5; font-weight: bold;';
+        headerRow.style.cssText = 'background: #f5f5f5; font-weight: bold; overflow: visible;';
 
         // First cell: empty or "Vehicle"
         let headerCell = headerRow.insertCell();
         headerCell.textContent = 'Vehicle';
-        headerCell.style.cssText = 'padding: 8px; border: 1px solid #ddd; min-width: 120px; text-align: left;';
+        headerCell.style.cssText = 'padding: 4px 6px; border: 1px solid #ddd; min-width: 120px; text-align: left;';
 
-        // Add car columns
-        carList.forEach((car, idx) => {
+        // Add car name + photo columns to header
+        carList.forEach((car) => {
             const cell = headerRow.insertCell();
             const make = car.metadata?.make || 'Unknown';
             const model = car.metadata?.model || '';
+            const url = car.metadata?.url || '';
+            const id = car.carId || '';
             const isCurrent = car.isCurrentCar ? ' (← Current)' : '';
 
             cell.style.cssText = `
-                padding: 8px;
+                padding: 4px 6px;
                 border: ${car.isCurrentCar ? '3px solid #667eea' : '1px solid #ddd'};
                 min-width: 140px;
                 text-align: center;
-                vertical-align: top;
+                vertical-align: middle;
                 background: ${this._getRatingColor(car.metadata?.sort)};
                 font-weight: ${car.isCurrentCar ? 'bold' : 'normal'};
+                font-size: 12px;
             `;
 
-            // Photo placeholder — filled asynchronously if URL present
-            const url = car.metadata?.url || '';
+            // Name row: clickable make + model with ID in brackets
+            const nameDiv = document.createElement('div');
+            nameDiv.style.cssText = 'font-weight: bold; margin-bottom: 4px;';
             if (url) {
-                const img = document.createElement('img');
-                img.alt = `${make} ${model}`;
-                img.style.cssText = `
-                    width: 100%;
-                    height: 90px;
-                    object-fit: cover;
-                    border-radius: 4px;
-                    margin-bottom: 4px;
-                    display: block;
-                    background: #eee;
-                `;
-                cell.appendChild(img);
-
-                this._fetchOgImage(url).then(imageUrl => {
-                    if (imageUrl) img.src = imageUrl;
-                    else img.style.display = 'none';
-                });
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.style.cssText = 'color: #667eea; text-decoration: underline;';
+                link.textContent = `${make} ${model}${isCurrent} [${id}]`;
+                nameDiv.appendChild(link);
+            } else {
+                nameDiv.textContent = `${make} ${model}${isCurrent} [${id}]`;
             }
+            cell.appendChild(nameDiv);
 
-            const makeDiv = document.createElement('div');
-            makeDiv.style.fontWeight = 'bold';
-            makeDiv.textContent = make + isCurrent;
-            cell.appendChild(makeDiv);
-
-            const modelDiv = document.createElement('div');
-            modelDiv.style.cssText = 'font-size: 11px; color: #666;';
-            modelDiv.textContent = model;
-            cell.appendChild(modelDiv);
+            // Photo below name — use stored photo_url (captured when user visited the page)
+            const photoUrl = car.metadata?.photo_url || '';
+            const img = document.createElement('img');
+            img.alt = `${make} ${model}`;
+            img.style.cssText = `
+                width: 100%;
+                height: 100px;
+                object-fit: cover;
+                border-radius: 4px;
+                display: block;
+                background: #eee;
+            `;
+            img.onerror = () => { img.style.display = 'none'; };
+            if (photoUrl) {
+                img.src = photoUrl;
+            } else {
+                img.style.display = 'none';
+            }
+            cell.appendChild(img);
         });
 
         // Table body with specs and features
@@ -96,14 +104,6 @@ window.CompareTable = {
 
         // Row: Note (first row)
         this._addNoteRow(tbody, carList);
-
-        // Row: URL
-        this._addCompareRow(tbody, 'Лінк', carList, (car) => {
-            const url = car.metadata?.url || car.url || '';
-            const id = car.carId || '—';
-            if (!url) return id;
-            return `<a href="${url}" target="_blank" style="color: #667eea; text-decoration: underline; font-size: 11px;">${id}</a>`;
-        }, 0, true); // true = isHtml
 
         // Row: Rating
         this._addCompareRow(tbody, 'Рейтинг', carList, (car) => {
@@ -149,7 +149,7 @@ window.CompareTable = {
         const featuresHeader = featuresHeaderRow.insertCell();
         featuresHeader.textContent = 'FEATURES';
         featuresHeader.colSpan = carList.length + 1;
-        featuresHeader.style.cssText = 'padding: 8px; border: 1px solid #ddd; text-align: left; color: #2e7d32;';
+        featuresHeader.style.cssText = 'padding: 3px 6px; border: 1px solid #ddd; text-align: left; color: #2e7d32;';
 
         // Feature rows
         allFeatures.forEach(feature => {
@@ -159,6 +159,26 @@ window.CompareTable = {
                 if (state === false) return '✗';
                 return '?';
             }, feature.priority, false);
+        });
+
+        // Row + column highlight on click
+        let activeRow = null, activeCol = -1;
+        table.addEventListener('click', (e) => {
+            const cell = e.target.closest('td, th');
+            if (!cell) return;
+
+            const rowEl = cell.parentElement;
+            const colIdx = cell.cellIndex;
+            const isSame = activeRow === rowEl && activeCol === colIdx;
+
+            activeRow = isSame ? null : rowEl;
+            activeCol = isSame ? -1 : colIdx;
+
+            table.querySelectorAll('td, th').forEach(c => {
+                const inRow = c.parentElement === activeRow;
+                const inCol = activeCol !== -1 && c.cellIndex === activeCol;
+                c.style.filter = (inRow || inCol) ? 'brightness(0.88)' : '';
+            });
         });
 
         container.appendChild(table);
@@ -175,7 +195,7 @@ window.CompareTable = {
         const labelCell = row.insertCell();
         labelCell.textContent = 'Нотатка';
         labelCell.style.cssText = `
-            padding: 8px;
+            padding: 3px 6px;
             border: 1px solid #ddd;
             font-weight: 500;
             background: #fafafa;
@@ -190,7 +210,7 @@ window.CompareTable = {
             const ratingBg = this._getRatingColor(car.metadata?.sort);
 
             cell.style.cssText = `
-                padding: 8px;
+                padding: 3px 6px;
                 border: 1px solid #ddd;
                 text-align: left;
                 font-size: 11px;
@@ -222,7 +242,7 @@ window.CompareTable = {
         const labelCell = row.insertCell();
         labelCell.textContent = label;
         labelCell.style.cssText = `
-            padding: 8px;
+            padding: 3px 6px;
             border: 1px solid #ddd;
             font-weight: 500;
             background: #fafafa;
@@ -243,7 +263,7 @@ window.CompareTable = {
             if (value === '✓') {
                 cell.textContent = '✓';
                 cell.style.cssText = `
-                    padding: 8px;
+                    padding: 3px 6px;
                     border: 1px solid #ddd;
                     text-align: center;
                     background: #E8F5E9;
@@ -256,7 +276,7 @@ window.CompareTable = {
                 const missingColor = priority === 2 ? '#c62828' : priority === 1 ? '#F57F17' : '#999';
                 cell.textContent = '✗';
                 cell.style.cssText = `
-                    padding: 8px;
+                    padding: 3px 6px;
                     border: 1px solid #ddd;
                     text-align: center;
                     background: ${missingBg};
@@ -269,7 +289,7 @@ window.CompareTable = {
                 const unknownColor = priority === 2 ? '#c62828' : '#bbb';
                 cell.textContent = '?';
                 cell.style.cssText = `
-                    padding: 8px;
+                    padding: 3px 6px;
                     border: 1px solid #ddd;
                     text-align: center;
                     background: ${unknownBg};
@@ -287,7 +307,7 @@ window.CompareTable = {
                 const bg   = color?.bg   || ratingBgColor;
                 const textColor = color?.text || '';
                 cell.style.cssText = `
-                    padding: 8px;
+                    padding: 3px 6px;
                     border: 1px solid #ddd;
                     text-align: center;
                     font-size: 11px;
@@ -297,62 +317,6 @@ window.CompareTable = {
                 `;
             }
         });
-    },
-
-    /**
-     * Fetch og:image from a car listing URL.
-     * Streams the response and aborts as soon as the tag is found,
-     * so we never download the full page.
-     * @param {string} url
-     * @returns {Promise<string|null>}
-     */
-    async _fetchOgImage(url) {
-        if (this._ogImageCache[url] !== undefined) {
-            return this._ogImageCache[url];
-        }
-
-        const controller = new AbortController();
-        let imageUrl = null;
-
-        try {
-            const response = await fetch(url, { signal: controller.signal });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let chunk = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                chunk += decoder.decode(value, { stream: true });
-
-                // Try both attribute orderings
-                const match =
-                    chunk.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-                    chunk.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-
-                if (match) {
-                    imageUrl = match[1];
-                    controller.abort();
-                    break;
-                }
-
-                // Stop after 100 KB — og:image is always in <head>
-                if (chunk.length > 100_000) {
-                    controller.abort();
-                    break;
-                }
-            }
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.warn('[CompareTable._fetchOgImage] Error:', err.message, url);
-            }
-        }
-
-        this._ogImageCache[url] = imageUrl;
-        return imageUrl;
     },
 
     /**

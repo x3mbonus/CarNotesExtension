@@ -28,7 +28,8 @@ window.MetadataParser = {
             mileage: null,
             year: null,
             address: null,
-            url: null
+            url: null,
+            photo_url: null
         };
 
         if (!extractedData) return metadata;
@@ -36,6 +37,11 @@ window.MetadataParser = {
         // Extract URL
         if (extractedData.url) {
             metadata.url = extractedData.url;
+        }
+
+        // Extract photo URL (og:image captured at page-visit time — no fetch needed)
+        if (extractedData.photo_url) {
+            metadata.photo_url = extractedData.photo_url;
         }
 
         // Extract address from dealer info (mobile.de, otomoto.pl, etc.)

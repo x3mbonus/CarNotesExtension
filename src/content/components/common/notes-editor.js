@@ -88,63 +88,43 @@ window.NotesEditor = {
             owners: existingNote?.owners || '',
             tow_hitch_type: existingNote?.tow_hitch_type || '',
             url: existingNote?.url || '',
-            address: existingNote?.address || ''
+            address: existingNote?.address || '',
+            photo_url: existingNote?.photo_url || ''
         };
 
-        // Auto-populate metadata from extracted data if not already set
-        if (!existingNote?.price && article) {
+        // Auto-populate metadata from extracted data for fields not yet saved.
+        // Guard: skip entirely if core fields are already populated.
+        const needsAutoPopulate = article && (!state.make || !state.price_eur || !state.mileage || !state.url);
+        if (needsAutoPopulate) {
             try {
                 const extractedData = window.extractCarData?.();
                 if (extractedData && window.MetadataParser) {
                     const parsedMetadata = window.MetadataParser.extractMetadata(extractedData);
-                    console.log('[CAR-NOTES] Auto-populated metadata from extracted data:', parsedMetadata);
 
-                    let autoSavePromises = [];
-                    // Only fill in empty fields
-                    if (!state.make && parsedMetadata.make) { state.make = parsedMetadata.make; }
-                    if (!state.model && parsedMetadata.model) { state.model = parsedMetadata.model; }
-                    if (!state.price && parsedMetadata.price) { state.price = parsedMetadata.price; }
-                    if (!state.price_eur && parsedMetadata.price_eur) { state.price_eur = parsedMetadata.price_eur; }
-                    if (!state.mileage && parsedMetadata.mileage) { state.mileage = parsedMetadata.mileage; }
-                    if (!state.year && parsedMetadata.year) { state.year = parsedMetadata.year; }
-                    if (!state.url && parsedMetadata.url) { state.url = parsedMetadata.url; }
-                    if (!state.address && parsedMetadata.address) { state.address = parsedMetadata.address; }
-
-                    // Auto-save extracted metadata to database immediately
-                    console.log('[CAR-NOTES] Saving auto-extracted metadata...');
-                    const autoSaveData = {
-                        make: state.make,
-                        model: state.model,
-                        price: state.price,
-                        price_eur: state.price_eur,
-                        mileage: state.mileage,
-                        year: state.year,
-                        url: state.url,
-                        address: state.address
-                    };
-
-                    // Save all auto-extracted fields in parallel
-                    for (const [fieldName, fieldValue] of Object.entries(autoSaveData)) {
-                        if (fieldValue) {
-                            autoSavePromises.push(
-                                window.NoteCallbacks.updateMetadataField(carId, fieldName, fieldValue)
-                                    .then(() => console.log('[CAR-NOTES] ✅ Auto-saved', fieldName, '=', fieldValue))
-                                    .catch(err => console.error('[CAR-NOTES] ❌ Error auto-saving', fieldName, ':', err))
-                            );
+                    // Collect only the fields that are actually missing
+                    const newFields = {};
+                    const pick = (stateKey, metaKey, dbKey) => {
+                        if (!state[stateKey] && parsedMetadata[metaKey]) {
+                            state[stateKey] = parsedMetadata[metaKey];
+                            newFields[dbKey || stateKey] = parsedMetadata[metaKey];
                         }
-                    }
+                    };
+                    pick('make',      'make');
+                    pick('model',     'model');
+                    pick('price',     'price');
+                    pick('price_eur', 'price_eur');
+                    pick('mileage',   'mileage');
+                    pick('year',      'year');
+                    pick('url',       'url');
+                    pick('address',   'address');
+                    pick('photo_url', 'photo_url');
 
-                    // Wait for all saves to complete (but don't block modal opening)
-                    if (autoSavePromises.length > 0) {
-                        Promise.all(autoSavePromises)
-                            .then(() => {
-                                console.log('[CAR-NOTES] ✅ All auto-extracted metadata saved');
-                                window.NotesEditor.showSaveNotification('Auto-extracted data saved', 'success', 2000);
-                            })
-                            .catch(err => {
-                                console.error('[CAR-NOTES] ❌ Error in auto-save:', err);
-                                window.NotesEditor.showSaveNotification('Error auto-saving data', 'error', 3000);
-                            });
+                    // One PATCH for all newly extracted fields
+                    if (Object.keys(newFields).length > 0) {
+                        console.log('[CAR-NOTES] Auto-saving missing fields in one request:', newFields);
+                        window.NoteCallbacks.updateMetadataFields(carId, newFields)
+                            .then(() => window.NotesEditor.showSaveNotification('Auto-extracted data saved', 'success', 2000))
+                            .catch(err => console.error('[CAR-NOTES] ❌ Error auto-saving:', err));
                     }
                 }
             } catch (error) {

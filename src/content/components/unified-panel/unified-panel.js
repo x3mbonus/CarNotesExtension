@@ -367,23 +367,6 @@ window.CarDetailPanel = {
         this.wrapperElement = wrapper;
         console.log('✅ Panel structure created and appended to DOM');
 
-        // Keep panel on top: re-append wrapper and expandBtn whenever the site
-        // adds new nodes to <body> (carousels, lightboxes, etc. appear after us).
-        const bringToFront = () => {
-            if (wrapper.parentNode) document.body.appendChild(wrapper);
-            if (expandBtn.parentNode) document.body.appendChild(expandBtn);
-        };
-        const domObserver = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                for (const node of m.addedNodes) {
-                    if (node !== wrapper && node !== expandBtn && node.nodeType === 1) {
-                        bringToFront();
-                        return;
-                    }
-                }
-            }
-        });
-        domObserver.observe(document.body, { childList: true });
     },
 
     /**

@@ -10,7 +10,7 @@ window.ComparePanel = {
     async showCompareModal(currentCarSort = null, currentCarId = null) {
         // Default filter: show sort 0 and 1, exclude sold
         let selectedRatings = [0, 1];
-        let maxCars = 10;
+        let maxCars = 15;
         let includeSold = false;
 
         // Create modal
@@ -26,7 +26,7 @@ window.ComparePanel = {
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 10000;
+            z-index: 2147483647;
         `;
 
         // Modal content
@@ -40,6 +40,8 @@ window.ComparePanel = {
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            color-scheme: light;
+            color: #111;
         `;
 
         // Header
@@ -147,7 +149,7 @@ window.ComparePanel = {
         maxInput.type = 'number';
         maxInput.value = maxCars;
         maxInput.min = 1;
-        maxInput.max = 100;
+        maxInput.max = 200;
         maxInput.style.cssText = `
             width: 50px;
             padding: 4px;
@@ -260,99 +262,74 @@ window.ComparePanel = {
     /**
      * Fetch and sort cars by rating (0, 1, 2, 3, -1) then by price
      * Current car without rating appears first
-     * OPTIMIZED: Fetches all car features in ONE batch request instead of N individual requests
+     * Features are fetched ONLY for the cars that will be displayed (after filter + limit).
      */
     async _fetchAndSortCars(selectedRatings, maxCars, currentCarId, currentCarSort, includeSold = false) {
         try {
-            // STEP 1: Get all cars
+            // STEP 1: Get all cars (metadata only — no features yet)
             const cars = await window.SupabaseApi?.getAllCars?.() || [];
+            if (cars.length === 0) return [];
 
-            if (cars.length === 0) {
-                return [];
-            }
-
-            // STEP 2: Fetch ALL car features in ONE batch request (not individual requests)
-            const allCarFeatures = await this._fetchAllCarFeatures(cars.map(c => c.car_id));
-            console.log('[ComparePanel._fetchAndSortCars] Got batch features:', allCarFeatures);
-
-            // STEP 3: Map to car objects with pre-fetched features
-            const carList = cars.map(car => {
-                const carFeatures = allCarFeatures[car.car_id] || {};
-                console.log(`[ComparePanel._fetchAndSortCars] Car ${car.car_id} has features:`, carFeatures);
-                return {
-                    carId: car.car_id,
-                    isCurrentCar: car.car_id === currentCarId,
-                    sold: car.sold || false,
-                    note: car.text || '',
-                    metadata: {
-                        make: car.make,
-                        model: car.model,
-                        url: car.url || '',
-                        address: car.address || '',
-                        price: parseFloat(car.price_eur || car.price || 0),
-                        price_eur: car.price_eur,
-                        price_pln: car.price,
-                        mileage: car.mileage,
-                        year: car.year,
-                        seat_type: car.seat_type,
-                        climate: car.climate,
-                        owners: car.owners,
-                        tow_hitch_type: car.tow_hitch_type,
-                        sort: car.sort
-                    },
-                    features: allCarFeatures[car.car_id] || {}
-                };
+            // STEP 2: Map to lightweight objects (no features)
+            const toCarObj = (car) => ({
+                carId: car.car_id,
+                isCurrentCar: car.car_id === currentCarId,
+                sold: car.sold || false,
+                note: car.text || '',
+                features: {},
+                metadata: {
+                    make: car.make,
+                    model: car.model,
+                    url: car.url || '',
+                    address: car.address || '',
+                    price: parseFloat(car.price_eur || car.price || 0),
+                    price_eur: car.price_eur,
+                    price_pln: car.price,
+                    mileage: car.mileage,
+                    year: car.year,
+                    seat_type: car.seat_type,
+                    climate: car.climate,
+                    owners: car.owners,
+                    tow_hitch_type: car.tow_hitch_type,
+                    sort: car.sort,
+                    photo_url: car.photo_url || ''
+                }
             });
 
-            // STEP 4: Filter and sort
-            const currentCar = carList.find(c => c.isCurrentCar);
-            const otherCars = carList.filter(c => !c.isCurrentCar);
+            const currentCar = cars.find(c => c.car_id === currentCarId);
+            const otherCars  = cars.filter(c => c.car_id !== currentCarId);
 
-            // Filter by selected ratings and sold status
-            const filteredCars = otherCars.filter(c => {
-                if (!includeSold && c.sold) return false;
-                const carRating = c.metadata.sort === null ? 'null' : c.metadata.sort;
-                return selectedRatings.includes(carRating);
-            });
-
-            // Sort by rating order (0, 1, 2, 3, -1), then by price (ascending)
+            // STEP 3: Filter by rating + sold, sort, then limit
             const ratingOrder = [0, 1, 2, 3, -1];
-            filteredCars.sort((a, b) => {
-                const aSort = a.metadata.sort;
-                const bSort = b.metadata.sort;
+            const filteredCars = otherCars
+                .filter(c => {
+                    if (!includeSold && c.sold) return false;
+                    const rating = c.sort === null ? 'null' : c.sort;
+                    return selectedRatings.includes(rating);
+                })
+                .sort((a, b) => {
+                    const aSort = a.sort, bSort = b.sort;
+                    if (aSort === null && bSort === null) return (a.price_eur || 999999) - (b.price_eur || 999999);
+                    if (aSort === null) return 1;
+                    if (bSort === null) return -1;
+                    const idxDiff = ratingOrder.indexOf(aSort) - ratingOrder.indexOf(bSort);
+                    if (idxDiff !== 0) return idxDiff;
+                    return (parseFloat(a.price_eur || 0) || 999999) - (parseFloat(b.price_eur || 0) || 999999);
+                });
 
-                // Handle nulls (unrated)
-                if (aSort === null && bSort === null) {
-                    const aPrice = a.metadata.price || 999999;
-                    const bPrice = b.metadata.price || 999999;
-                    return aPrice - bPrice;
-                }
-                if (aSort === null) return 1; // Null sorts after all rated cars
-                if (bSort === null) return -1;
+            // STEP 4: Apply maxCars limit BEFORE fetching features
+            const limitedOthers = filteredCars.slice(0, currentCar ? maxCars - 1 : maxCars);
+            const visibleCars   = [...(currentCar ? [currentCar] : []), ...limitedOthers];
 
-                const aRatingIdx = ratingOrder.indexOf(aSort);
-                const bRatingIdx = ratingOrder.indexOf(bSort);
+            // STEP 5: Fetch features only for the cars we will display
+            const featuresMap = await this._fetchAllCarFeatures(visibleCars.map(c => c.car_id));
 
-                if (aRatingIdx !== bRatingIdx) {
-                    return aRatingIdx - bRatingIdx;
-                }
-
-                // Same rating, sort by price ascending
-                const aPrice = a.metadata.price || 999999;
-                const bPrice = b.metadata.price || 999999;
-                return aPrice - bPrice;
+            // STEP 6: Assemble final list with features
+            const result = visibleCars.map(car => {
+                const obj = toCarObj(car);
+                obj.features = featuresMap[car.car_id] || {};
+                return obj;
             });
-
-            // Build result: current car ALWAYS first, then filtered cars (up to maxCars total)
-            const result = [];
-
-            if (currentCar) {
-                result.push(currentCar);
-            }
-
-            // Add other cars, reserving space for current car
-            const remainingSlots = Math.max(0, maxCars - result.length);
-            result.push(...filteredCars.slice(0, remainingSlots));
 
             return result;
         } catch (error) {

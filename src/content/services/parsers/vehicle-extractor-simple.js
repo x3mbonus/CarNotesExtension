@@ -33,6 +33,7 @@ window.extractMobileDeCarData = function() {
     features: [],
     price: {},
     dealer: {},
+    photo_url: document.querySelector('meta[property="og:image"]')?.content || '',
   };
 
   // Extract vehicle name
@@ -148,6 +149,7 @@ window.extractOtomotoCarData = function() {
     features: [],
     price: {},
     dealer: {},
+    photo_url: document.querySelector('meta[property="og:image"]')?.content || '',
   };
 
   // Helper function to get value by data-testid with more robust sibling hunting

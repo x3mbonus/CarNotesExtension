@@ -88,6 +88,13 @@ window.NoteCallbacks = {
     },
 
     /**
+     * Update multiple metadata fields in one PATCH request
+     */
+    async updateMetadataFields(carId, fields) {
+        return await window.SupabaseApi?.updateMetadataFields?.(carId, fields) || { success: true };
+    },
+
+    /**
      * Update single feature (independent operation)
      */
     async updateFeature(carId, featureKey, state) {

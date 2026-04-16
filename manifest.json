@@ -3,6 +3,9 @@
   "name": "Car Notes",
   "version": "1.0.0",
   "description": "Add colored notes to car listings on mobile.de and otomoto.pl",
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
   "permissions": ["storage", "scripting"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline';"
