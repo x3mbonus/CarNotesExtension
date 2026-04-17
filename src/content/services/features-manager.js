@@ -20,7 +20,8 @@ window.FeaturesManager = {
         this.fullFeaturesListCache = config.map(f => ({
             label: f.label,
             key: f.key,
-            priority: f.priority
+            priority: f.priority,
+            cool_priority: f.cool_priority ?? null
         }));
 
         console.log('[FeaturesManager] Cached full features list:', this.fullFeaturesListCache.length, 'features');
@@ -43,7 +44,7 @@ window.FeaturesManager = {
             try {
                 this.featureConfigCache = await window.SupabaseApi.getFeatureConfig();
                 this.fullFeaturesListCache = this.featureConfigCache.map(f => ({
-                    label: f.label, key: f.key, priority: f.priority
+                    label: f.label, key: f.key, priority: f.priority, cool_priority: f.cool_priority ?? null
                 }));
                 this.saveFeatureConfigToStorage(this.featureConfigCache);
                 console.log('[FeaturesManager.getFeatureConfig] ✅ Refreshed from API:', this.featureConfigCache.length, 'features');

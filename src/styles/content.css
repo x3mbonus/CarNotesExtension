@@ -119,6 +119,19 @@
     font-weight: 600;
 }
 
+/* Cool features when present — medium green, clearly above regular active */
+.ui-feature-btn.cool-present {
+    border-color: #388E3C;
+    background: #A5D6A7;
+    color: #1B5E20;
+    font-weight: 700;
+}
+
+.ui-feature-btn.cool-present:hover {
+    background: #81C784;
+    border-color: #2E7D32;
+}
+
 .ui-feature-btn.missing {
     border-color: #F44336;
     background: #FFEBEE;

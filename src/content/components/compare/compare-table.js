@@ -43,7 +43,7 @@ window.CompareTable = {
         headerCell.textContent = 'Vehicle';
         headerCell.style.cssText = 'padding: 4px 6px; border: 1px solid #ddd; min-width: 120px; text-align: left;';
 
-        // Add car name + photo columns to header
+        // Add car name columns to header (name + ID only, no photo)
         carList.forEach((car) => {
             const cell = headerRow.insertCell();
             const make = car.metadata?.make || 'Unknown';
@@ -63,46 +63,25 @@ window.CompareTable = {
                 font-size: 12px;
             `;
 
-            // Name row: clickable make + model with ID in brackets
-            const nameDiv = document.createElement('div');
-            nameDiv.style.cssText = 'font-weight: bold; margin-bottom: 4px;';
             if (url) {
                 const link = document.createElement('a');
                 link.href = url;
                 link.target = '_blank';
-                link.style.cssText = 'color: #667eea; text-decoration: underline;';
-                link.textContent = `${make} ${model}${isCurrent} [${id}]`;
-                nameDiv.appendChild(link);
+                link.style.cssText = 'color: #667eea; text-decoration: underline; font-weight: bold;';
+                link.textContent = `${make} ${model}${isCurrent} ${id}`;
+                cell.appendChild(link);
             } else {
-                nameDiv.textContent = `${make} ${model}${isCurrent} [${id}]`;
+                cell.textContent = `${make} ${model}${isCurrent} ${id}`;
             }
-            cell.appendChild(nameDiv);
-
-            // Photo below name — use stored photo_url (captured when user visited the page)
-            const photoUrl = car.metadata?.photo_url || '';
-            const img = document.createElement('img');
-            img.alt = `${make} ${model}`;
-            img.style.cssText = `
-                width: 100%;
-                height: 100px;
-                object-fit: cover;
-                border-radius: 4px;
-                display: block;
-                background: #eee;
-            `;
-            img.onerror = () => { img.style.display = 'none'; };
-            if (photoUrl) {
-                img.src = photoUrl;
-            } else {
-                img.style.display = 'none';
-            }
-            cell.appendChild(img);
         });
 
         // Table body with specs and features
         const tbody = table.createTBody();
 
-        // Row: Note (first row)
+        // Photo row — first body row, full width per column
+        this._addPhotoRow(tbody, carList);
+
+        // Row: Note
         this._addNoteRow(tbody, carList);
 
         // Row: Rating
@@ -158,7 +137,7 @@ window.CompareTable = {
                 if (state === true) return '✓';
                 if (state === false) return '✗';
                 return '?';
-            }, feature.priority, false);
+            }, feature.priority, false, null, feature.cool_priority ?? null);
         });
 
         // Row + column highlight on click
@@ -183,6 +162,62 @@ window.CompareTable = {
 
         container.appendChild(table);
         return container;
+    },
+
+    /**
+     * Photo row — first tbody row, clickable, uses stored photo_url
+     */
+    _addPhotoRow(tbody, carList) {
+        const row = tbody.insertRow();
+
+        const labelCell = row.insertCell();
+        labelCell.textContent = 'Фото';
+        labelCell.style.cssText = `
+            padding: 3px 6px;
+            border: 1px solid #ddd;
+            font-weight: 500;
+            background: #fafafa;
+            min-width: 120px;
+            text-align: left;
+            vertical-align: middle;
+        `;
+
+        carList.forEach(car => {
+            const cell = row.insertCell();
+            const make = car.metadata?.make || '';
+            const model = car.metadata?.model || '';
+            const url = car.metadata?.url || '';
+            const photoUrl = car.metadata?.photo_url || '';
+
+            cell.style.cssText = `
+                padding: 3px 6px;
+                border: ${car.isCurrentCar ? '3px solid #667eea' : '1px solid #ddd'};
+                background: ${this._getRatingColor(car.metadata?.sort)};
+                text-align: center;
+                vertical-align: middle;
+            `;
+
+            if (photoUrl) {
+                const img = document.createElement('img');
+                img.alt = `${make} ${model}`;
+                img.style.cssText = `
+                    width: 100%;
+                    height: 100px;
+                    object-fit: cover;
+                    border-radius: 4px;
+                    display: block;
+                    background: #eee;
+                    ${url ? 'cursor: pointer;' : ''}
+                `;
+                img.src = photoUrl;
+                img.onerror = () => { img.style.display = 'none'; };
+                if (url) img.onclick = () => window.open(url, '_blank');
+                cell.appendChild(img);
+            } else {
+                cell.textContent = '—';
+                cell.style.color = '#bbb';
+            }
+        });
     },
 
     /**
@@ -233,8 +268,9 @@ window.CompareTable = {
      * @param {number} priority - Feature priority (0=low, 1=medium, 2=high) — affects feature cell color
      * @param {boolean} isHtml - If true, value is treated as HTML content
      * @param {Function} [getColor] - Optional fn(car) → { bg, text } to override cell color
+     * @param {number|null} [coolPriority] - null = not cool; 1+ = cool level, gets super-green highlight when present
      */
-    _addCompareRow(tbody, label, carList, getValue, priority = 0, isHtml = false, getColor = null) {
+    _addCompareRow(tbody, label, carList, getValue, priority = 0, isHtml = false, getColor = null, coolPriority = null) {
         const row = tbody.insertRow();
         row.style.cssText = 'border-bottom: 1px solid #ddd;';
 
@@ -262,12 +298,13 @@ window.CompareTable = {
             // Colors match side panel (UIComponents.createFeaturesGrid) — priority-aware
             if (value === '✓') {
                 cell.textContent = '✓';
+                const isCool = coolPriority > 0;
                 cell.style.cssText = `
                     padding: 3px 6px;
-                    border: 1px solid #ddd;
+                    border: 1px solid ${isCool ? '#388E3C' : '#ddd'};
                     text-align: center;
-                    background: #E8F5E9;
-                    color: #2e7d32;
+                    background: ${isCool ? '#A5D6A7' : '#E8F5E9'};
+                    color: ${isCool ? '#1B5E20' : '#2e7d32'};
                     font-weight: bold;
                 `;
             } else if (value === '✗') {

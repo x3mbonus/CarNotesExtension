@@ -178,7 +178,8 @@ window.SupabaseApi = {
                     climate: row.climate || null,
                     owners: row.owners || null,
                     tow_hitch_type: row.tow_hitch_type || null,
-                    url: row.url || null
+                    url: row.url || null,
+                    photo_url: row.photo_url || null
                 };
             }
 
@@ -242,7 +243,8 @@ window.SupabaseApi = {
                     climate: row.climate || null,
                     owners: row.owners || null,
                     tow_hitch_type: row.tow_hitch_type || null,
-                    url: row.url || null
+                    url: row.url || null,
+                    photo_url: row.photo_url || null
                 };
             }
 

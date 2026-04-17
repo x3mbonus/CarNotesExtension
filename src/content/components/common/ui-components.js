@@ -205,7 +205,7 @@ window.UIComponents = {
             const state = currentFeatures[feature.key];
 
             if (state === true) {
-                btn.classList.add('active');
+                btn.classList.add(feature.cool_priority > 0 ? 'cool-present' : 'active');
                 btn.textContent = `✓ ${feature.label}`;
                 btn.title = 'Click to cycle: Unknown (?) → Present (✓) → Missing (✗) → Unknown (?)';
             } else if (state === false) {
