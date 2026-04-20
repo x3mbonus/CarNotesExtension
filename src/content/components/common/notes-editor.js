@@ -559,6 +559,30 @@ window.NotesEditor = {
         ));
         sections.appendChild(featuresSection);
 
+        // PHOTO section - at the bottom, only if photo_url is available
+        if (state.photo_url) {
+            const photoSection = document.createElement('div');
+            photoSection.className = 'modal-section';
+            photoSection.appendChild(window.UIComponents.createSectionLabel('PHOTO'));
+
+            const img = document.createElement('img');
+            img.src = state.photo_url;
+            img.alt = `${state.make || ''} ${state.model || ''}`.trim() || 'Car photo';
+            img.style.cssText = `
+                width: 100%;
+                max-height: 220px;
+                object-fit: cover;
+                border-radius: 6px;
+                display: block;
+                background: #eee;
+                ${state.url ? 'cursor: pointer;' : ''}
+            `;
+            img.onerror = () => { photoSection.style.display = 'none'; };
+            if (state.url) img.onclick = () => window.open(state.url, '_blank');
+            photoSection.appendChild(img);
+            sections.appendChild(photoSection);
+        }
+
         // DELETE BUTTON - at the very bottom (hidden by default, visible on hover)
         const deleteSection = document.createElement('div');
         deleteSection.className = 'modal-section';
